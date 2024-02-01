@@ -1,0 +1,478 @@
+/*
+  Copyright 2024 Cedric Hotopp
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+*/
+
+body {
+  --brightness: 100%;
+
+  --color: #fff;
+  --color_i: #000;
+
+  --color_s: #fff;
+  --color_si: #000;
+
+  --color_hover_s: #fff;
+
+  opacity: 0;
+
+  color: var(--text_1);
+
+  background: var(--shade_0-2);
+
+  transition: all 250ms;
+}
+
+body > .preset {
+  position: absolute;
+  left: 0;
+  top: 3vmin;
+  width: 100vw;
+  height: 1em;
+
+  text-align: center;
+  text-decoration: underline;
+  font-size: 3em;
+  font-weight: bold;
+}
+
+body > .preset > .text {
+  cursor: pointer;
+}
+
+body > .head_selector {
+  position: fixed;
+  left: 2vmin;
+  top: calc(2vmin + 3em);
+  width: calc(6.25ch + 66vmin - 1em + 8px);
+  height: calc(43vmin - 1.4em);
+
+  padding: 2vmin;
+
+  overflow: auto;
+}
+
+body > .head_selector > .content {
+  column-count: 6;
+  column-gap: 2vmin;
+
+  position: absolute;
+  left: 2vmin;
+  top: 2vmin;
+  width: calc(100% - 4vmin);
+}
+
+body > .head_selector > .content > .head {
+  cursor: pointer;
+
+  aspect-ratio: 1/1;
+
+  position: relative;
+  width: calc(100% - 4px);
+
+  margin-top: 2vmin;
+
+  border: 2px solid #fff;
+  border-radius: 1vmin;
+
+  background: linear-gradient( 45deg, var(--shade_1-0), var(--shade_3-0) );
+
+  transform: translateY(50%);
+}
+
+body > .head_selector > .content > .head.left:not(.right) {
+  border-color: var(--blue_border);
+
+  background: linear-gradient( 45deg, var(--blue_hover), var(--blue_active) );
+}
+
+body > .head_selector > .content > .head.right:not(.left) {
+  border-color: var(--red_border);
+
+  background: linear-gradient( 45deg, var(--red_hover), var(--red_active) );
+}
+
+body > .head_selector > .content > .head.left.right {
+  border-color: var(--purple_border);
+
+  background: linear-gradient( 45deg, var(--red_hover) 0%, var(--red_active) 50%, var(--blue_hover) 50%, var(--blue_active) 100% );
+}
+
+body > .head_selector > p {
+  position: absolute;
+  left: 2vmin;
+  width: calc(100% - 4vmin);
+
+  padding: 0 1vmin;
+}
+
+body > .head_selector > p > code.left {
+  float: left;
+}
+
+body > .head_selector > p > code.right {
+  float: right;
+}
+
+body > .head_selector > p.selected {
+  top: calc(6vmin - 1em);
+}
+
+body > .head_selector > p.note {
+  bottom: 4vmin;
+
+  font-size: 0.9em;
+}
+
+body > .head_selector > p.note > code {
+  padding: 1vmin;
+  border-radius: 1vmin;
+}
+
+body > .head_selector > p.note > code.left {
+  background: var(--blue_active);
+}
+
+body > .head_selector > p.note > code.right {
+  background: var(--red_active);
+}
+
+body > .body_selector {
+  position: fixed;
+  right: 2vmin;
+  top: calc(2vmin + 3em);
+  width: calc(100vw - 6.25ch - 82vmin + 1em - 8px);
+  height: calc(100vh - 19vmin);
+
+  padding: 2vmin;
+
+  overflow: auto;
+}
+
+body > .body_selector > .content {
+  column-count: 1;
+  column-gap: 2vmin;
+
+  position: absolute;
+  left: 2vmin;
+  top: 2vmin;
+
+  width: calc(100% - 4vmin);
+}
+
+body > .body_selector > .content > .body {
+  cursor: pointer;
+
+  position: relative;
+  width: calc(100% - 4px);
+  height: calc(calc(6.25ch + 66vmin - 1em + 8px - 2vmin - 10vmin) / 6);
+
+  margin-top: 2vmin;
+
+  border: 2px solid #fff;
+  border-radius: 1vmin;
+
+  background: linear-gradient( 45deg, var(--shade_1-0), var(--shade_3-0) );
+
+  transform: translateY(50%);
+}
+
+body > .body_selector > .content > .body.selected {
+  border-color: var(--blue_border);
+
+  background: linear-gradient( 45deg, var(--blue_hover), var(--blue_active) );
+}
+
+body > .body_selector > p.selected {
+  position: absolute;
+  left: 2vmin;
+  top: calc(6vmin - 1em);
+  width: calc(100% - 4vmin);
+
+  padding: 0 1vmin;
+
+  text-align: center;
+}
+
+body > .brightness {
+  position: fixed;
+  left: 2vmin;
+  bottom: 2vmin;
+  width: 5ch;
+  height: 50vmin;
+
+  font-size: 1.4em;
+}
+
+body > .brightness > .slider {
+  cursor: pointer;
+
+  position: absolute;
+  left: 0;
+  top: calc(1em + 1vmin);
+  width: 100%;
+  height: calc(100% - 1em - 1vmin - 1px);
+
+  border: 2px solid white;
+  border-radius: 1vmin;
+
+  background: linear-gradient(to top, var(--shade_0-0), var(--color, #fff));
+}
+
+body > .brightness > .slider > .handle {
+  cursor: grab;
+
+  position: absolute;
+  left: calc(-12.5% - 2px);
+  top: calc(100% - var(--brightness, 100%));
+  width: 125%;
+  height: 1vmin;
+
+  border: 2px solid var(--color_i, #000);
+  border-radius: 1vmin;
+
+  transform: translateY(-50%);
+
+  background: var(--color, #fff);
+}
+
+body > .brightness > .number {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 1em;
+
+  border-bottom: 1px solid var(--text_1);
+
+  line-height: 0.8em;
+  text-align: center;
+}
+
+body > .brightness > .number > .input {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: calc(100% - 1.5ch);
+  height: 100%;
+}
+
+body > .brightness > .number > .input:focus {
+  outline: none;
+}
+
+body > .brightness > .number > .unit {
+  position: absolute;
+  right: 0;
+}
+
+body > .color_spectrum {
+  position: fixed;
+  left: calc(3vmin + 6.25ch + 4px);
+  bottom: calc(2vmin - 4px);
+  width: calc(69vmin - 1em + 4px);
+  height: calc(50vmin + 3px);
+
+  font-size: 1.4em;
+  text-align: center;
+}
+
+body > .color_spectrum > .rgb {
+  display: flex;
+  justify-content: space-evenly;
+
+  position: absolute;
+  left: 0;
+  bottom: calc(50vmin - 1em + 3px);
+  width: calc(49vmin - 1em + 2px);
+  height: 1em;
+}
+
+body > .color_spectrum > .rgb > .number {
+  display: inline-block;
+
+  width: 5ch;
+
+  border-bottom: 1px solid var(--text_1);
+
+  line-height: 0.8em;
+}
+
+body > .color_spectrum > .rgb > .number > .input {
+  outline: 0;
+}
+
+body > .color_spectrum > canvas.picker {
+  cursor: pointer;
+
+  aspect-ratio: 1/1;
+
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: calc(49vmin - 1em - 2px);
+
+  border: 2px solid #fff;
+  border-top-left-radius: 1vmin;
+  border-bottom-left-radius: 1vmin;
+
+  filter: brightness(calc(var(--brightness, 100%) / 1.1));
+}
+
+body > .color_spectrum > .recent {
+  --columns: 0;
+
+  display: grid;
+  align-content: center;
+  justify-content: center;
+  grid-template: 3.5vmin / repeat(4, 3.5vmin);
+  gap: 0.75vmin;
+
+  position: absolute;
+  left: calc(49vmin - 1em + 1px);
+  bottom: calc(10vmin + 4px);
+  width: calc(18vmin + 4px);
+  height: calc(37vmin - 1em - 1px);
+
+  padding: 1vmin;
+  border-top-right-radius: 2vmin;
+  border-bottom-right-radius: 2vmin;
+
+  background: linear-gradient( 45deg, var(--shade_1-0), var(--shade_3-0) );
+}
+
+body > .color_spectrum > .recent > .color {
+  --color_s: #000;
+
+  cursor: pointer;
+
+  aspect-ratio: 1/1;
+
+  border: 0.25vmin solid var(--text_1);
+  border-radius: 25%;
+
+  background: var(--color_s, #000);
+}
+
+body > .color_spectrum > .recent > .divider {
+  position: absolute;
+  left: 5%;
+  bottom: calc(4.25vmin * calc(var(--blocks) / var(--columns) + 0.5) - 1.1875vmin);
+  width: 90%;
+  height: 0.125vmin;
+
+  border-radius: 0.0625vmin;
+
+  background: var(--shade_f-4);
+
+  transform: translateY(-50%);
+}
+
+body > .color_spectrum > .picked {
+  aspect-ratio: 1/1;
+
+  position: absolute;
+  left: calc(50vmin - 1em - 1vmin);
+  bottom: 0;
+  height: 10vmin;
+
+  border: 2px solid var(--shade_f-4);
+  border-bottom-right-radius: 1vmin;
+
+  background: var(--color_s, #fff);
+}
+
+body > .preview {
+  position: fixed;
+  left: calc(63vmin + 6.25ch + 8px);
+  bottom: calc(3vmin - 4px);
+  width: calc(100vw - 87.5vmin - 6.25ch - 12px);
+  height: 8vmin;
+
+  border: 2px solid var(--shade_f-4);
+  border-radius: 1vmin;
+
+  background: var(--color_bg, #000);
+  /* background: var(--page_bg, #000); */
+
+  transition: background-color 500ms;
+}
+
+body > .preview > svg.easel {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+
+  border-radius: 1vmin;
+
+  /* background: var(--color_bg, #000) center bottom / 100% 50% no-repeat; */
+}
+
+body > :is(.cancel, .save).button {
+  aspect-ratio: 3/2;
+
+  position: fixed;
+  bottom: 2vmin;
+  height: 7vmin;
+
+  border-radius: 2vmin;
+
+  text-align: center;
+
+  background: var(--shade_2-0);
+
+  transition: all 250ms;
+}
+
+body > :is(.cancel, .save).button:hover {
+  background: var(--hover-color);
+
+  filter: brightness(1.2);
+}
+
+body > :is(.cancel, .save).button:active {
+  background: var(--active-color);
+
+  filter: brightness(1.4);
+}
+
+body > .cancel.button {
+  --hover-color: var(--red_hover);
+  --active-color: var(--red_active);
+
+  right: 13vmin;
+
+  border-top-right-radius: 1vmin;
+  border-bottom-right-radius: 1vmin;
+}
+
+body > .save.button {
+  --hover-color: var(--green_hover);
+  --active-color: var(--green_active);
+
+  right: 2vmin;
+
+  border-top-left-radius: 1vmin;
+  border-bottom-left-radius: 1vmin;
+}
+
+body > :is(.cancel, .save).button > svg {
+  aspect-ratio: 1/1;
+
+  position: relative;
+  top: 12.5%;
+  height: 75%;
+}

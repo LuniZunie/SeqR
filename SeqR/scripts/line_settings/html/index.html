@@ -1,0 +1,154 @@
+<!--
+  Copyright 2024 Cedric Hotopp
+
+  Licensed under the Apache License, Version 2.0 (the 'License');
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an 'AS IS' BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+-->
+
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>SeqR - Line Settings</title>
+    <link rel='icon' href='../../../assets/icons/favicon.ico'/>
+
+    <meta charset='utf-8'/>
+    <meta name='description' content='SeqR'/>
+    <meta name='keywords' content='SeqR, RNA, DNA, Sequencer, Sequence, RNA Sequencer, DNA Sequencer, Biology, GFT, GFF, GFF3'/>
+    <meta name='author' content='Cedric Hotopp'/>
+    <meta name='viewport' content='width=device-width, initial-scale=1'/>
+
+    <link rel='stylesheet' href='../../global/css/global.css'/>
+
+    <script type='module' src='../../global/js/prototypes.mjs'></script>
+    <script type='module' src='../../global/js/global.mjs'></script>
+
+    <link rel='stylesheet' href='../css/main.css'/>
+
+    <script type='module' src='../js/main.mjs' defer></script>
+    <script type='module' src='../js/event.mjs' defer></script>
+
+    <noscript>Your browser does not support JavaScript! This website will not work without JavaScript!</noscript>
+  </head>
+  <body>
+    <div class='preset'>
+      <span class='text'>&lt;Custom Preset&gt;</span>
+    </div>
+    <div class='head_selector'>
+      <div class='content'>
+        <svg class='head template' events='head'>
+          <g fill='currentColor'>
+            <path class='template'/>
+          </g>
+        </svg>
+      </div>
+      <p class='selected'>
+        <code class='left'>
+          <span class='name'>none</span> &lpar;<span class='x'>0</span>, <span class='y'>0</span>&rpar;
+        </code>
+        <code class='right'>
+          <span class='name'>none</span> &lpar;<span class='x'>0</span>, <span class='y'>0</span>&rpar;
+        </code>
+      </p>
+      <p class='note'>
+        <code class='left'>left click (left head)</code>
+        <code class='right'>right click (right head)</code>
+      </p>
+    </div>
+
+    <div class='body_selector'>
+      <div class='content'>
+        <svg class='body template' events='body'>
+          <g fill='currentColor'>
+            <path class='template'/>
+          </g>
+        </svg>
+      </div>
+      <p class='selected'>
+        <code class='text'>
+          <span class='name'>none</span> &lpar;<span class='x'>0</span>, <span class='y'>0</span>&rpar;
+        </code>
+      </p>
+    </div>
+
+    <div class='brightness'>
+      <div class='slider' events='brightness_slider'>
+        <div class='handle'></div>
+      </div>
+      <div class='number'>
+        <span class='input select' contenteditable spellcheck='false' events='brightness_input'>100</span>
+        <span class='unit'>%</span>
+      </div>
+    </div>
+
+    <div class='color_spectrum'>
+      <div class='rgb'>
+        <div class='r number'>
+          <span class='label'>R</span>
+          <span class='input select' contenteditable spellcheck='false' events='color_spectrum_input'>255</span>
+        </div>
+        <div class='g number'>
+          <span class='label'>G</span>
+          <span class='input select' contenteditable spellcheck='false' events='color_spectrum_input'>255</span>
+        </div>
+        <div class='b number'>
+          <span class='label'>B</span>
+          <span class='input select' contenteditable spellcheck='false' events='color_spectrum_input'>255</span>
+        </div>
+      </div>
+      <canvas class='picker' events='color_spectrum_picker'></canvas>
+      <div class='recent'>
+        <div class='color template' events='recent_color'></div>
+
+        <div class='preset divider'></div>
+        <div class='shade divider'></div>
+
+        <div class='color preset' events='recent_color' color='255,0,0,128'></div>
+        <div class='color preset' events='recent_color' color='255,0,0'></div>
+        <div class='color preset' events='recent_color' color='255,128,0'></div>
+        <div class='color preset' events='recent_color' color='255,255,0'></div>
+        <div class='color preset' events='recent_color' color='0,255,0'></div>
+        <div class='color preset' events='recent_color' color='0,255,0,128'></div>
+        <div class='color preset' events='recent_color' color='0,255,225'></div>
+        <div class='color preset' events='recent_color' color='0,128,255'></div>
+        <div class='color preset' events='recent_color' color='0,0,255'></div>
+        <div class='color preset' events='recent_color' color='128,0,255'></div>
+        <div class='color preset' events='recent_color' color='255,0,255'></div>
+        <div class='color preset' events='recent_color' color='255,128,0,128'></div>
+        <div class='color preset' events='recent_color' color='255,255,255'></div>
+        <div class='color preset' events='recent_color' color='255,255,255,170'></div>
+        <div class='color preset' events='recent_color' color='255,255,255,85'></div>
+        <div class='color preset' events='recent_color' color='255,255,255,0'></div>
+      </div>
+      <div class='picked'></div>
+    </div>
+
+    <div class='preview'>
+      <svg class='easel'>
+        <path class='template' fill-rule='nonzero'/>
+      </svg>
+    </div>
+
+    <div class='cancel button' events='cancel'>
+      <svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>
+        <polyline points='14 15 9 20 4 15'/>
+        <path d='M20 4h-7a4 4 0 0 0-4 4v12'/>
+      </svg>
+    </div>
+    <div class='save button' events='save'>
+      <svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>
+        <path d='M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z'/>
+        <polyline points='17 21 17 13 7 13 7 21'/>
+        <polyline points='7 3 7 8 15 8'/>
+      </svg>
+    </div>
+  </body>
+</html>

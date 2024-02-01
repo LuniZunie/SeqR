@@ -19,10 +19,6 @@ Object.entries(globalExports).forEach(
   ([ name, exported ]) => window[name] = exported
 );
 
-export {
-  Disk,
-};
-
 Object.defineProperty(Array.prototype, 'prandom', {
   enumerable: false,
   value: function(seed, i, remove) {
@@ -470,7 +466,6 @@ Object.defineProperty(Number.prototype, 'max', {
 Object.defineProperty(Number.prototype, 'clamp', {
   enumerable: false,
   value: function(min = -Infinity, max = Infinity) {
-    (min ??= -Infinity), (max ??= Infinity);
     return Math.max(Math.min(this, max), min);
   }
 });
@@ -725,6 +720,20 @@ Object.defineProperty(Document.prototype, 'getByClass', {
   enumerable: false,
   value: Document.prototype.getElementsByClassName
 });
+Object.defineProperty(Document.prototype, 'createElementByQs', {
+  enumerable: false,
+  value: function(cssPath) {
+    const [ , tag, id, classes ] = cssPath.match(/(\w+)(?:#(\w+))?(?:\.([\w-]+(?:\.[\w-]+)*))?/);
+
+    const $ = this.createElement(tag);
+    if (id)
+      $.id = id;
+    if (classes)
+      $.classList.add(...classes.split('.'));
+
+    return $;
+  }
+});
 
 [ Element ].forEach(obj => {
   Object.defineProperty(obj.prototype, 'icon', {
@@ -867,24 +876,38 @@ Object.defineProperty(Document.prototype, 'getByClass', {
       return $s.length == 1 ? $s[0] : $s;
     }
   });
+  Object.defineProperty(obj.prototype, 'createElementByQs', {
+    enumerable: false,
+    value: function(cssPath) {
+      const [ , tag, id, classes ] = cssPath.match(/(\w+)(?:#(\w+))?(?:\.([\w-]+(?:\.[\w-]+)*))?/);
+
+      const $ = document.createElement(tag);
+      if (id)
+        $.id = id;
+      if (classes)
+        $.classList.add(...classes.split('.'));
+
+      return $;
+    }
+  });
   Object.defineProperty(obj.prototype, 'prependChild', {
     enumerable: false,
     value: function($, target = 0) {
       target ??= 0;
-      if (!($ instanceof Element)) {
+      if (!($ instanceof Node)) {
         if (typeof $ == 'string')
-          $ = document.createElement($);
+          $ = this.createElementByQs($);
         else
           throw 'Bad Element Passed';
       }
 
-      if (target instanceof Element) {
+      if (target instanceof Node) {
         this.insertBefore($, target);
       } else if (Number.isInteger(target) || target == Infinity || target == -Infinity) {
         if (target >>> 31 || target == -Infinity)
           this.insertBefore($, this.childNodes[(this.childNodes.length + target + 1).clamp(0)]);
         else
-          this.insertBefore($, this.childNodes[target.clamp(null, this.childNodes.length - 1)]);
+          this.insertBefore($, this.childNodes[target.clamp(undefined, this.childNodes.length - 1)]);
       }
 
       return $;
@@ -894,20 +917,20 @@ Object.defineProperty(Document.prototype, 'getByClass', {
     enumerable: false,
     value: function($, target = Infinity) {
       target ??= Infinity;
-      if (!($ instanceof Element)) {
+      if (!($ instanceof Node)) {
         if (typeof $ == 'string')
-          $ = document.createElement($);
+          $ = this.createElementByQs($);
         else
           throw 'Bad Element Passed';
       }
 
-      if (target instanceof Element)
+      if (target instanceof Node)
         this.insertBefore($, target.nextSibling);
       else if (Number.isInteger(target) || target == Infinity || target == -Infinity) {
         if (target >>> 31 || target == -Infinity)
           this.insertBefore($, this.childNodes[(this.childNodes.length + ++target).clamp(0)]);
         else
-          this.insertBefore($, this.childNodes[(++target).clamp(null, this.childNodes.length)]);
+          this.insertBefore($, this.childNodes[(++target).clamp(undefined, this.childNodes.length)]);
       }
 
       return $;
@@ -917,14 +940,14 @@ Object.defineProperty(Document.prototype, 'getByClass', {
     enumerable: false,
     value: function($, target = 0) {
       target ??= 0;
-      if (!($ instanceof Element)) {
+      if (!($ instanceof Node)) {
         if (typeof $ == 'string')
-          $ = document.createElement($);
+          $ = this.createElementByQs($);
         else
           throw 'Bad Element Passed';
       }
 
-      if (target instanceof Element) {
+      if (target instanceof Node) {
         if (target.parentNode.isEqualNode(this))
           this.replaceChild($, target);
         else
@@ -933,7 +956,7 @@ Object.defineProperty(Document.prototype, 'getByClass', {
         if (target >>> 31 || target == -Infinity)
           this.insertBefore($, this.childNodes[(this.childNodes.length + ++target).clamp(0)]);
         else
-          this.insertBefore($, this.childNodes[target.clamp(null, this.childNodes.length)]);
+          this.insertBefore($, this.childNodes[target.clamp(undefined, this.childNodes.length)]);
       }
 
       return $;
@@ -1375,584 +1398,3 @@ Object.defineProperty(CanvasRenderingContext2D.prototype, 'rect', {
     this.fillRect(...args.flat(Infinity));
   },
 });
-
-function EvalKeyPath(kPath) {
-  try {
-    const regex = /(\w+)|\['([^']+?)'\]|\["([^"]+?)"\]|\[`([^`]+?)`\]/g;
-    let match;
-
-    const path = [];
-    while ((match = regex.exec(kPath)) !== null)
-    	path.push(match.filter(Boolean)[1]);
-
-    return path;
-  } catch (e) {
-    return;
-  }
-}
-
-class Disk {
-  #file = class {
-    #disk;
-
-    #file;
-    #name;
-    #extension;
-    #type;
-
-    #url;
-    constructor(disk, file) {
-      const [ name, extension, type ] = (function(file) {
-        if (file.length == 1)
-          return [ file, 'txt' ];
-
-        const extension = file.pop();
-        return [ file.join('.'), extension, {
-          txt: 'text/plain',
-          json: 'application/json',
-        }[extension] ];
-      })(file.split('.'));
-
-      this.#disk = disk;
-
-      this.#file = file;
-      this.#name = name;
-      this.#extension = extension;
-      this.#type = type;
-
-      this.#url = URL.createObjectURL(new Blob([ '' ], { type: type })).replace('blob:', '');
-    }
-
-    get disk() {
-      return this.#disk;
-    }
-
-    get file() {
-      return this.#file;
-    }
-    get name() {
-      return this.#name;
-    }
-    get extension() {
-      return this.#extension;
-    }
-    get type() {
-      return this.#type;
-    }
-
-    get url() {
-      return `blob:${this.#url}`;
-    }
-
-    #readRaw = async function() {
-      return await fetch(
-        `blob:${this.#url}`,
-        { cache: 'no-store' }
-      ).then(async function(response) {
-        let content = '';
-
-        const decoder = new TextDecoder();
-        await (await response.blob()).stream().pipeTo(new WritableStream({
-          write: chunk => content += decoder.decode(chunk)
-        }));
-
-        return content;
-      });
-    }
-
-    #read = async function(){
-      return await this.#readRaw().then(content => (
-        parsers => (parsers[this.#type] ?? parsers['text/plain'])(content)
-      )({
-        'text/plain': content => content.split('\n'),
-        'application/json': content => JSON.parse(content)
-      }));
-    }
-
-    async read() {
-      return await this.#readRaw().then(content => (
-        parsers => (parsers[this.#type] ?? parsers['text/plain'])(content)
-      )({
-        'text/plain': content => content,
-        'application/json': content => JSON.parse(content)
-      }));;
-    }
-
-    async readLine(line) {
-      if (this.#type != 'text/plain')
-        throw `Cannot read line from JSON file!`;
-      else if (line % 1 != 0)
-        throw `Line ${line} is not a valid line number!`;
-
-      return (await this.#read())[line];
-    }
-
-    async readLines(...lines) {
-      if (this.#type != 'text/plain')
-        throw `Cannot read line from JSON file!`;
-      else if (lines.some(line => line % 1 != 0))
-        throw `Some lines are not valid line numbers!`;
-
-      return (await this.#read()).filter((_, i) => lines.includes(i));
-    }
-
-    async readRange(start, end) {
-      if (this.#type != 'text/plain')
-        throw `Cannot read line from JSON file!`;
-      else if (start % 1 != 0 || end % 1 != 0)
-        throw `Some lines are not valid line numbers!`;
-
-      return (await this.#read()).slice(start, end + 1);
-    }
-
-    async readRanges(...ranges) {
-      if (this.#type != 'text/plain')
-        throw `Cannot read line from JSON file!`;
-      else if (ranges.some(([ start, end ]) => start % 1 != 0 || end % 1 != 0))
-        throw `Some lines are not valid line numbers!`;
-
-      return (content =>
-        ranges.map(([ start, end ]) => content.slice(start, end + 1))
-      )(await this.#read());
-    }
-
-    async readRangesFlat(...ranges) {
-      if (this.#type != 'text/plain')
-        throw `Cannot read line from JSON file!`;
-      else if (ranges.some(([ start, end ]) => start % 1 != 0 || end % 1 != 0))
-        throw `Some lines are not valid line numbers!`;
-
-      return (await this.#read()).filter((_, i) =>
-        ranges.some(([ start, end ]) => i >= start && i <= end)
-      );
-    }
-
-    async readPath(path) {
-      if (this.#type != 'application/json')
-        throw `Cannot read path from text file!`;
-
-      return new Function('obj', `return obj${path[0] == '.' || path[0] == '[' ? '' : '.'}${path};`)(await this.#read());
-    }
-
-    async readPaths(...paths) {
-      if (this.#type != 'application/json')
-        throw `Cannot read path from text file!`;
-
-      return (content => {
-        const obj = {};
-        let objPath;
-        paths.map(path => {
-          let currentObj = content;
-          objPath = obj;
-          EvalKeyPath(path).map((k, i, arr) => {
-            currentObj = currentObj[k];
-
-            if (i == arr.length - 1)
-              objPath[k] = currentObj;
-            else
-              objPath = objPath[k] = {};
-          });
-        });
-
-        return obj;
-      })(await this.#read());
-    }
-
-    async readPathsFlat(...paths) {
-      if (this.#type != 'application/json')
-        throw `Cannot read path from text file!`;
-
-      return (content =>
-        paths.map(path =>
-          new Function('obj', `return obj${path[0] == '.' || path[0] == '[' ? '' : '.'}${path};`)(content)
-        )
-      )(await this.#read());
-    }
-
-    #write = async function(handlers) {
-      const file = this;
-      return await this.#read().then(function(content) {
-        URL.revokeObjectURL(`blob:${file.#url}`);
-        file.#url = URL.createObjectURL(new Blob([
-          ((content, parsers) =>
-            (parsers[file.#type] ?? parsers['text/plain'])(content)
-          )((handlers[file.#type] ?? handlers['text/plain']).call(file, content), {
-            'text/plain': content => content.join('\n'),
-            'application/json': content => JSON.stringify(content)
-          })
-        ], { type: file.#type })).replace('blob:', '');
-      });
-    };
-
-    async write(str) {
-      URL.revokeObjectURL(`blob:${this.#url}`);
-      this.#url = URL.createObjectURL(new Blob([
-        ((content, parsers) =>
-          (parsers[this.#type] ?? parsers['text/plain'])(content)
-        )(str, {
-          'text/plain': content => content,
-          'application/json': content => JSON.stringify(content)
-        })
-      ], { type: this.#type })).replace('blob:', '');
-    }
-
-    async writeLine(str, line) {
-      return await this.#write({
-        'text/plain': content => {
-          if (line % 1 != 0)
-            throw `Line ${line} is not a valid line number!`;
-
-          content[line] = str;
-          return content;
-        },
-        'application/json': () => { throw `Cannot write line to JSON file!`; }
-      });
-    }
-
-    async writeLines(str, ...paths) {
-      return await this.#write({
-        'text/plain': content => {
-          paths.forEach(line => {
-            if (line % 1 != 0)
-              throw `Line ${line} is not a valid line number!`;
-
-              content[line] = str;
-          });
-
-          return content;
-        },
-        'application/json': () => { throw `Cannot write line to JSON file!`; }
-      });
-    }
-
-    async writeRange(str, start, end) {
-      return await this.#write({
-        'text/plain': content => {
-          if (start % 1 != 0 || end % 1 != 0)
-            throw `Some lines are not valid line numbers!`;
-
-          for (let i = start; i <= end; i++)
-            content[i] = str;
-
-          return content;
-        },
-        'application/json': () => { throw `Cannot write line to JSON file!`; }
-      });
-    }
-
-    async writeRanges(str, ...ranges) {
-      return await this.#write({
-        'text/plain': content => {
-          if (ranges.some(([ start, end ]) => start % 1 != 0 || end % 1 != 0))
-            throw `Some lines are not valid line numbers!`;
-
-          ranges.forEach(([ start, end ]) => {
-            for (let i = start; i <= end; i++)
-              content[i] = str;
-          });
-
-          return content;
-        },
-        'application/json': () => { throw `Cannot write line to JSON file!`; }
-      });
-    }
-
-    async overwriteRange(str, start, end) {
-      return await this.#write({
-        'text/plain': content => {
-          if (start % 1 != 0 || end % 1 != 0)
-            throw `Some lines are not valid line numbers!`;
-
-          content.splice(start, end - start + 1, str);
-          return content;
-        },
-        'application/json': () => { throw `Cannot write line to JSON file!`; }
-      });
-    }
-
-    async overwriteRanges(str, ...ranges) {
-      return await this.#write({
-        'text/plain': content => {
-          if (ranges.some(([ start, end ]) => start % 1 != 0 || end % 1 != 0))
-            throw `Some lines are not valid line numbers!`;
-
-          ranges.forEach(([ start, end ]) => {
-            for (let i = start; i <= end; i++) {
-              if (i == start)
-                content[i] = str;
-              else
-                content[i] = undefined;
-            }
-          });
-
-          return content.filter(line => line !== undefined);
-        },
-        'application/json': () => { throw `Cannot write line to JSON file!`; }
-      });
-    }
-
-    async writePath(v, path) {
-      return await this.#write({
-        'text/plain': () => { throw `Cannot write path to text file!`; },
-        'application/json': content => {
-          new Function('obj', 'v', `obj${path[0] == '.' || path[0] == '[' ? '' : '.'}${path} = v;`)(content, v);
-          return content;
-        }
-      });
-    }
-
-    async writePaths(v, ...paths) {
-      return await this.#write({
-        'text/plain': () => { throw `Cannot write path to text file!`; },
-        'application/json': content => {
-          paths.forEach(path =>
-            new Function('obj', 'v', `obj${path[0] == '.' || path[0] == '[' ? '' : '.'}${path} = v;`)(content, v)
-          );
-
-          return content;
-        }
-      });
-    }
-
-    async append(str) {
-      return await this.#write({
-        'text/plain': content => (content.join('\n') + str).split('\n'),
-        'application/json': content => (obj =>
-          Object.assign(obj, str)
-        )(content)
-      });
-    }
-
-    async appendLine(str) {
-      return await this.#write({
-        'text/plain': content => [ ...content, str ],
-        'application/json': () => { throw `Cannot append line to JSON file!`; }
-      });
-    }
-
-    async prepend(str) {
-      return await this.#write({
-        'text/plain': content => (str + content.join('\n')).split('\n'),
-        'application/json': content => (obj =>
-          Object.assign(obj, str)
-        )(content)
-      });
-    }
-
-    async prependLine(str) {
-      return await this.#write({
-        'text/plain': content => [ str, ...content ],
-        'application/json': () => { throw `Cannot prepend line to JSON file!`; }
-      });
-    }
-
-    async insertBefore(str, ...paths) {
-      return await this.#write({
-        'text/plain': content => {
-          paths.forEach(line => {
-            if (line % 1 != 0)
-              throw `Line ${line} is not a valid line number!`;
-
-            content.splice(line, 0, str);
-          });
-
-          return content;
-        },
-        'application/json': () => { throw `Cannot insert line to JSON file!`; }
-      });
-    }
-
-    async insertAfter(str, ...paths) {
-      return await this.#write({
-        'text/plain': content => {
-          paths.forEach(line => {
-            if (line % 1 != 0)
-              throw `Line ${line} is not a valid line number!`;
-
-            content.splice(line + 1, 0, str);
-          });
-
-          return content;
-        },
-        'application/json': () => { throw `Cannot insert line to JSON file!`; }
-      });
-    }
-
-    async deleteLine(line) {
-      return await this.#write({
-        'text/plain': content => {
-          if (line % 1 != 0)
-            throw `Line ${line} is not a valid line number!`;
-
-          content.splice(line, 1);
-          return content;
-        },
-        'application/json': () => { throw `Cannot delete line from JSON file!`; }
-      });
-    }
-
-    async deleteLines(...lines) {
-      return await this.#write({
-        'text/plain': content => {
-          if (lines.some(line => line % 1 != 0))
-            throw `Some lines are not valid line numbers!`;
-
-          lines.sort((a, b) => b - a).forEach(line => content.splice(line, 1));
-          return content;
-        },
-        'application/json': () => { throw `Cannot delete line from JSON file!`; }
-      });
-    }
-
-    async deleteRange(start, end) {
-      return await this.#write({
-        'text/plain': content => {
-          if (start % 1 != 0 || end % 1 != 0)
-            throw `Some lines are not valid line numbers!`;
-
-          content.splice(start, end - start + 1);
-          return content;
-        },
-        'application/json': () => { throw `Cannot delete line from JSON file!`; }
-      });
-    }
-
-    async deleteRanges(...ranges) {
-      return await this.#write({
-        'text/plain': content => {
-          if (ranges.some(([ start, end ]) => start % 1 != 0 || end % 1 != 0))
-            throw `Some lines are not valid line numbers!`;
-
-          content = content.filter((_, i) =>
-            !ranges.some(([ start, end ]) => i >= start && i <= end)
-          );
-
-          return content;
-        },
-        'application/json': () => { throw `Cannot delete line from JSON file!`; }
-      });
-    }
-
-    async deletePath(path) {
-      return await this.#write({
-        'text/plain': () => { throw `Cannot delete path from text file!`; },
-        'application/json': content => {
-          new Function('obj', `delete obj${path[0] == '.' || path[0] == '[' ? '' : '.'}${path};`)(content);
-          return content;
-        }
-      });
-    }
-
-    async deletePaths(...paths) {
-      return await this.#write({
-        'text/plain': () => { throw `Cannot delete path from text file!`; },
-        'application/json': content => {
-          paths.forEach(path =>
-            new Function('obj', `delete obj${path[0] == '.' || path[0] == '[' ? '' : '.'}${path};`)(content)
-          );
-
-          return content;
-        }
-      });
-    }
-
-    async delete() {
-      this.#disk.delete(this.#file);
-    }
-  };
-
-  #files = {};
-  new(file, overwrite) {
-    if (this.#files[file] && !overwrite)
-      throw `File ${file} already exists! Overwrite file is set to OFF`;
-    else {
-      if (this.#files[file])
-        URL.revokeObjectURL(`blob:${this.#files[file].url}`);
-
-      return this.#files[file] = new this.#file(this, file);
-    }
-  }
-  load(file) {
-    if (this.#files[file])
-      return this.#files[file];
-    else
-      throw `File ${file} does not exist!`;
-  }
-  delete(file) {
-    if (this.#files[file]) {
-      URL.revokeObjectURL(`blob:${this.#files[file].url}`);
-      delete this.#files[file];
-    } else
-      throw `File ${file} does not exist!`;
-  }
-  wipe() {
-    this.#files.k_forEach(
-      file => this.delete(file)
-    );
-  }
-  get files() {
-    return structuredClone(this.#files);
-  }
-};
-
-async function diskTest() {
-  const disk = new Disk();
-
-  await (async function(file) {
-    await file.write('3: Write');
-
-    await file.writeLine('5: Write Line', 1);
-    await file.writeLines('6-7: Write Lines', 2, 3);
-
-    await file.writeRange('9-10: Write Range', 4, 7);
-    await file.writeRanges('11-13,15-17: Write Ranges', [ 7, 9 ], [ 11, 13 ]);
-
-    await file.overwriteRange('8: Overwrite Range', 4, 5);
-    await file.overwriteRanges('11-12,14-15: Overwrite Ranges', [ 10, 11 ], [ 13, 14 ]);
-
-    await file.append(' 17: Append');
-    await file.appendLine('18: Append Lines');
-
-    await file.prepend('3: Prepend ');
-    await file.prependLine('1: Prepend Line');
-
-    await file.insertBefore('2: Insert Before', 1);
-    await file.insertAfter('4: Insert After', 2);
-
-    console.log(await file.read());
-    console.log(await file.readLine(1));
-    console.log(await file.readLines(2, 3));
-    console.log(await file.readRange(4, 6));
-    console.log(await file.readRanges([7, 12], [ 8, 15 ]));
-    console.log(await file.readRangesFlat([ 7, 12 ], [ 8, 15 ]));
-
-    await file.deleteLine(1);
-    await file.deleteLines(2, 3);
-    await file.deleteRange(4, 6);
-    await file.deleteRanges([7, 12], [ 8, 15]);
-
-    console.log(await file.read());
-
-    console.log(file.url);
-  })(disk.new('test.txt'));
-
-  await (async function(file) {
-    await file.write({ a: 1, b: [5, {a: 6}, 5], c: 3 });
-
-    await file.writePath(4, 'd');
-    await file.writePaths(5, 'e', 'f');
-
-    console.log(await file.read());
-    console.log(await file.readPath('.a'));
-    console.log(await file.readPaths('b', '.c'));
-    console.log(await file.readPathsFlat('b', '.c'));
-
-    await file.deletePath('.a');
-    await file.deletePaths('.d', '.c');
-
-    console.log(await file.read());
-
-    console.log(file.url);
-  })(disk.new('test.json'));
-}
-diskTest();

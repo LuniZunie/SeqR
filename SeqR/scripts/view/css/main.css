@@ -19,6 +19,39 @@ body {
   --side_width: 30vw;
 }
 
+body > .loading_screen {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 100vw;
+  height: 100vh;
+
+  background: inherit;
+
+  z-index: 2147483647;
+
+  transition: all 1000ms;
+}
+
+body > .loading_screen.hide {
+  pointer-events: none;
+
+  opacity: 0;
+}
+
+body > .loading_screen > svg {
+  aspect-ratio: 1/1;
+
+  position: absolute;
+  left: calc(50% - 12.5vmin);;
+  top: calc(50% - 12.5vmin);
+  width: 25vmin;
+
+  color: var(--text_1);
+
+  animation: rotate360Clockwise 1s linear infinite;
+}
+
 body > .top {
   position: fixed;
   left: 0;
@@ -92,7 +125,7 @@ body > .top > :is(.import, .delete_data, .draw, .export).button.disabled {
   filter: brightness(0.1);
 }
 
-body > .top > :is(.import, .delete_data, .draw, .export).button > svg {
+body > .top > :is(.import, .delete_data, .draw, .export).button svg {
   aspect-ratio: 1/1;
 
   position: relative;
@@ -100,14 +133,14 @@ body > .top > :is(.import, .delete_data, .draw, .export).button > svg {
   height: 75%;
 }
 
-body > .top > :is(.import, .delete_data, .draw, .export).button:hover:not(:has(svg.confirm:hover)),
+body > .top > :is(.import, .delete_data, .draw, .export).button:hover:not(:has(.confirm:hover)),
 body > .top > input[type=file]:hover ~ .import.button {
   background: var(--hover_color);
 
   filter: brightness(1.2);
 }
 
-body > .top > :is(.import, .delete_data, .draw, .export).button:hover:active:not(:has(svg.confirm:hover:active)),
+body > .top > :is(.import, .delete_data, .draw, .export).button:hover:active:not(:has(.confirm:hover:active)),
 body > .top > input[type=file]:hover:active ~ .import.button {
   background: var(--active_color);
 
@@ -119,13 +152,13 @@ body > .top > :is(.import, .delete_data, .draw, .export).button.cancel {
   --active_color: var(--red_active);
 }
 
-body > .top > :is(.import, .delete_data, .draw, .export).button:not(.cancel) > svg:not(.cancel_icon),
-body > .top > :is(.import, .delete_data, .draw, .export).button.cancel > .cancel_icon {
+body > .top > :is(.import, .delete_data, .draw, .export).button:not(.cancel) > svg:not(.x_icon),
+body > .top > :is(.import, .delete_data, .draw, .export).button.cancel > .x_icon {
   display: inline-block;
 }
 
-body > .top > :is(.import, .delete_data, .draw, .export).button.cancel > svg:not(.cancel_icon),
-body > .top > :is(.import, .delete_data, .draw, .export).button:not(.cancel) > .cancel_icon {
+body > .top > :is(.import, .delete_data, .draw, .export).button.cancel > svg:not(.x_icon),
+body > .top > :is(.import, .delete_data, .draw, .export).button:not(.cancel) > .x_icon {
   display: none;
 }
 
@@ -149,7 +182,7 @@ body > .top > .delete_data.button {
   left: calc(calc(var(--top_height) - 2px - 2vh) * 3/2 + 3vh);
 }
 
-body > .top > .delete_data.button > svg.confirm {
+body > .top > .delete_data.button > .confirm > svg {
   top: 0;
   height: calc(calc(var(--top_height) - 2px - 2vh) * 0.7);
   width: calc(calc(var(--top_height) - 2px - 2vh) * 0.7 * 3/2);
@@ -162,15 +195,15 @@ body > .top > .delete_data.button > svg.confirm {
   transition: height 500ms, opacity 500ms, transform 200ms, filter 250ms;
 }
 
-body > .top > .delete_data.button > svg.confirm:hover {
+body > .top > .delete_data.button > .confirm:hover {
   filter: brightness(1.2);
 }
 
-body > .top > .delete_data.button > svg.confirm:hover:active {
+body > .top > .delete_data.button > .confirm:hover:active {
   filter: brightness(1.4);
 }
 
-body > .top > .delete_data.button > svg.confirm.hide {
+body > .top > .delete_data.button > .confirm.hide > svg {
   pointer-events: none;
 
   width: 0;
@@ -492,11 +525,11 @@ body > .settings {
   aspect-ratio: 3/2;
 
   position: fixed;
-  left: calc(calc(100vw - calc(min(95vw, 140vh) - 1vmin)) / 2);
+  left: calc(calc(100vw - calc(min(95vw, 140vh) - 4vmin)) / 2);
   top: calc(calc(145vh - calc(min(95vw, 140vh) - 1vmin)) / 2);
-  width: calc(min(95vw, 140vh) - 1vmin);
+  width: calc(min(95vw, 140vh) - 4vmin);
 
-  padding: 0.5vmin;
+  padding: 2vmin;
 
   background: var(--shade_0-2);
 
@@ -509,6 +542,347 @@ body > .settings.hide {
   pointer-events: none;
 
   opacity: 0;
+}
+
+body > .settings > .title {
+  text-align: center;
+  font-size: 2.75em;
+
+  margin-top: 0;
+}
+
+body > .settings > .selection {
+  width: calc(100% - 4vmin);
+
+  padding: 2vmin;
+  border-radius: 2vmin;
+
+  text-align: center;
+
+  background: var(--shade_0-3);
+}
+
+body > .settings > .selection > .title {
+  margin: 0;
+  margin-bottom: 0.5em;
+
+  font-size: 1.5em;
+  line-height: 1em;
+}
+
+body > .settings > .selection > .range {
+  cursor: pointer;
+
+  position: relative;
+  height: 6vh;
+  width: 100%;
+
+  border-radius: 1vmin;
+
+  background: var(--shade_0-0)
+}
+
+body > .settings > .selection > .range > .shading {
+  position: relative;
+  height: 100%;
+
+  border-radius: 1vmin;
+
+  background: var(--dark_blue_background);
+}
+
+body > .settings > .selection > .range > :is(.min, .max) {
+  position: absolute;
+  top: 0;
+
+  font-size: 1em;
+  line-height: 6vh;
+
+  z-index: 2;
+}
+
+body > .settings > .selection > .range > .min {
+  left: 1ch;
+}
+
+body > .settings > .selection > .range > .max {
+  right: 1ch;
+}
+
+body > .settings > .selection > .inputs {
+  height: 6vh;
+}
+
+body > .settings > .selection > .inputs > input {
+  width: min(10ch, 20%);
+  height: 6vh;
+
+  padding: 0 1ch;
+  outline: 0;
+  border: 0;
+  border-radius: 1vmin;
+
+  font-size: 1.25em;
+  text-align: center;
+  color: var(--text_1);
+
+  background: var(--shade_0-1);
+}
+
+body > .settings > .selection > .inputs > input.min {
+  float: left;
+}
+
+body > .settings > .selection > .inputs > input.max {
+  float: right;
+}
+
+body > .settings > :is(.text_style, .padding, .background) {
+  width: calc(100% - 4vmin);
+
+  margin-top: 2vmin;
+  padding: 2vmin;
+  border-radius: 2vmin;
+
+  text-align: center;
+
+  background: var(--shade_0-3);
+}
+
+body > .settings > :is(.text_style, .padding, .background) > .title {
+  margin: 0;
+  margin-bottom: 0.5em;
+
+  font-size: 1.5em;
+  line-height: 1em;
+}
+
+body > .settings > .text_style > .content {
+  columns: 2;
+  column-gap: 1vmin;
+}
+
+body > .settings > .text_style > .content > .style,
+body > .settings > .padding > div {
+  display: inline-block;
+  width: calc(100% - 6vmin);
+
+  margin: 1vmin;
+  padding: 2vmin;
+  border-radius: 2vmin;
+
+  background: var(--shade_1-0);
+}
+
+body > .settings > .text_style > .content > .style > .title,
+body > .settings > .padding > div > .title {
+  margin: 0;
+  margin-bottom: 0.5em;
+
+  font-size: 1.5em;
+  line-height: 1em;
+}
+
+body > .settings > .text_style > .content > .style:is(.align, .character) > .content {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  align-content: center;
+}
+
+body > .settings > .text_style > .content > .style:is(.align, .character) > .content > .button {
+  --hover_color: var(--blue_hover);
+  --active_color: var(--blue_active);
+
+  aspect-ratio: 1/1;
+
+  position: relative;
+  width: calc(100% - 1em);
+  height: 6vh;
+
+  margin: 0.5em;
+  border-radius: 1vmin;
+
+  text-align: center;
+  line-height: 6vh;
+
+  background: var(--shade_0-2);
+
+  transition: all 250ms;
+}
+
+body > .settings > .text_style > .content > .style:is(.align, .character) > .content > .button:hover {
+  background: var(--dark_blue_hover);
+
+  filter: brightness(1.2);
+}
+
+body > .settings > .text_style > .content > .style:is(.align, .character) > .content > .button:active {
+  background: var(--dark_blue_hover);
+
+  filter: brightness(1.4);
+}
+
+body > .settings > .text_style > .content > .style:is(.align, .character) > .content > .button.selected {
+  background: var(--blue_background);
+}
+
+body > .settings > .text_style > .content > .style.font > .content,
+body > .settings > .padding > div > .content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-content: center;
+}
+
+body > .settings > .text_style > .content > .style.font > .content > .option,
+body > .settings > .padding > div > .content > .option {
+  width: calc(100% - 1.5em);
+
+  margin: 0.25em;
+  padding: 0.5em;
+  border-radius: 1vmin;
+
+  font-size: 1.25em;
+
+  background: var(--shade_0-3);
+}
+
+body > .settings > .text_style > .content > .style.font > .content > .option.family {
+  grid-column: 1 / span 2;
+}
+
+body > .settings > .text_style > .content > .style.font > .content > .option > label,
+body > .settings > .padding > div > .content > .option > label {
+  display: block;
+
+  margin-bottom: 1vmin;
+}
+
+body > .settings > .text_style > .content > .style.font > .content > .option > input,
+body > .settings > .padding > div > .content > .option > input,
+body > .settings > .background > input {
+  width: calc(100% - 1em);
+  height: 2em;
+
+  padding: 0 0.5em;
+  outline: 0;
+  border: 0;
+  border-radius: 1vmin;
+
+  font-size: 1em;
+  text-align: left;
+  color: var(--text_1);
+
+  background: var(--shade_0-1);
+}
+
+body > .settings > .text_style > .content > .style.font > .content > .option > input[type='color'] {
+  padding: 1vmin;
+}
+
+body > .settings > .text_style > .content > .style.preview {
+  height: 1.5em;
+
+  line-height: 1.5em;
+
+  transition: background 250ms;
+}
+
+body > .settings > .text_style > .content > .style.preview > span {
+  transition: color 250ms;
+}
+
+body > .settings > .padding {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+body > .settings > .padding > .title {
+  grid-column: 1 / span 2;
+}
+
+body > .settings > .background {
+  text-align: left;
+
+  margin-bottom: 2vmin;
+}
+
+body > .settings > .background > .title {
+  text-align: center;
+}
+
+body > .settings > .background > input {
+  width: calc(100% - 7vh - 1em);
+  height: 6vh;
+
+  font-size: 1.25em;
+}
+
+body > .settings > .background > .preview {
+  aspect-ratio: 1/1;
+  float: right;
+
+  height: calc(6vh - 4px);
+
+  border: 2px solid var(--shade_0-1);
+  border-radius: 1vmin;
+}
+
+body > .settings > :is(.cancel, .save).button {
+  aspect-ratio: 3/2;
+  display: block;
+
+  position: relative;
+  bottom: 0;
+  height: 6vmin;
+
+  border-radius: 2vmin;
+
+  text-align: center;
+
+  background: var(--shade_2-0);
+
+  transition: all 250ms;
+}
+
+body > .settings > :is(.cancel, .save).button:hover {
+  background: var(--hover-color);
+
+  filter: brightness(1.2);
+}
+
+body > .settings > :is(.cancel, .save).button:active {
+  background: var(--active-color);
+
+  filter: brightness(1.4);
+}
+
+body > .settings > .cancel.button {
+  --hover-color: var(--red_hover);
+  --active-color: var(--red_active);
+
+  float: right;
+
+  border-top-right-radius: 1vmin;
+  border-bottom-right-radius: 1vmin;
+}
+
+body > .settings > .save.button {
+  --hover-color: var(--orange_hover);
+  --active-color: var(--orange_active);
+
+  float: right;
+  margin-left: 1vmin;
+
+  border-top-left-radius: 1vmin;
+  border-bottom-left-radius: 1vmin;
+}
+
+body > .settings > :is(.cancel, .save).button > svg {
+  aspect-ratio: 1/1;
+
+  position: relative;
+  top: 12.5%;
+  height: 75%;
 }
 
 body > .side {

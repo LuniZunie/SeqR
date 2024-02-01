@@ -32,6 +32,7 @@ export {
   LinePreview,
   AreGroupsClean,
   GetAutoGroup,
+  UpdateSettingsTextPreview,
   CreateFileName,
 };
 
@@ -63,22 +64,18 @@ function Loaded() {
       page.events.add($, ...evs.split(/\s/));
   });
 
-  return;
-  page.events.get.auto_group.click();
-  page.events.get.settings_save.click.call(body.qs('body > .top > .draw.button'));
-  return;
-  page.events.get.group_edit.click.call(body.qs('body > .side > .content > .groups > .group:not(.template) > .content > .edit'));
-  return;
-  page.events.get.group_data.click.call(body.qs('body > .side > .content > .groups > .group > .content > .data:not(.template) > .content'));
+  (function($loadingScreen) {
+    $loadingScreen.addClass('hide');
+    setTimeout(() => $loadingScreen?.memRmv(), parseTransition($loadingScreen).max());
+  })(body.qs('body > .loading_screen'));
 }
 
 function WaitForLoad() {
-  if (page.loaded.v_every(v => v === true))
+  if (page.loaded.v_every(v => v === true) && Promise.allSettled(global.pagePromises))
     return Loaded();
 
   requestIdleCallback(WaitForLoad);
 }
-
 WaitForLoad();
 
 function LoadEvents($, includeSelf = true) {
@@ -103,7 +100,7 @@ FixedUpdate(function(e) {
   const clip = JSON.stringify(global.clipboard?.data);
   (global.groups ?? []).forEach(
     ({ $, o }) => o.forEach(
-      (options, i) => $.qs(`.content > .data[datum-index='${i}'] > .paste.button`).setClass('disabled',
+      (options, i) => $.qs(`.content > .data[datum-index='${i}'] > .paste.button`)?.setClass('disabled',
         !(global.clipboard?.type == 'line_style' && global.clipboard?.data?._len() && JSON.stringify(options) != clip)
       )
     )
@@ -115,6 +112,11 @@ FixedUpdate(function(e) {
  * @returns {Promise<void>} A promise that resolves when the painting is complete.
  */
 async function Paint(e) {
+  if (page.paintDisk instanceof Disk)
+    page.paintDisk.wipe();
+
+  page.paintDisk = new Disk();
+
   body.qs('body > .top > .draw').addClass('cancel');
 
   const $notif = body.appendChild('notification');
@@ -123,8 +125,13 @@ async function Paint(e) {
   body.qs('body > .content > .easel').icon('loading', true); // maybe center on page instead of centering on easel
 
   let settings = e;
+  const currentRun = ++global.drawRun;
   await new Promise(async r_paint => {
-    global.drawReject = r_paint;
+    global.drawReject = function(reason = 'cancel') {
+      global.drawRun++;
+      r_paint(reason);
+    };
+
     if (!global.data?._len() || !global.groups?.length) {
       $notif.innerText = '<b style="color: red">ERROR:</b> No data or groups loaded!';
 
@@ -134,7 +141,6 @@ async function Paint(e) {
       }, 3000);
     }
 
-    const settingify = (setting, placeholder) => setting === '' ? placeholder : setting;
     settings = {
       draw: {
         d: {}, // data
@@ -143,30 +149,49 @@ async function Paint(e) {
         l: {}, // chunk location
         y: {}, // y-coordinates
       },
-      range: {
-        min: +settingify(global.draw.range.min, global.dataRange[0]),
-        max: +settingify(global.draw.range.max, global.dataRange[1]),
-      },
-      text: { // add position modifier
-        align: settingify(global.draw.text.align, 'center'),
-        size: +settingify(global.draw.text.size, 16),
-        color: settingify(global.draw.text.color, 'white'),
-        font: settingify(global.draw.text.font, 'arial'),
-      },
-      padding: {
-        page: {
-          top: +settingify(global.draw.padding.page.top, 0),
-          right: +settingify(global.draw.padding.page.right, 0),
-          bottom: +settingify(global.draw.padding.page.bottom, 0),
-          left: +settingify(global.draw.padding.page.left, 0),
+      ...{
+        range: {
+          min: global.dataRange[0],
+          max: global.dataRange[1],
         },
-        group: {
-          top: +settingify(global.draw.padding.group.top, 0),
-          right: +settingify(global.draw.padding.group.right, 0),
-          bottom: +settingify(global.draw.padding.group.bottom, 0),
-          left: +settingify(global.draw.padding.group.left, 0),
+        text: { // add position modifier
+          align: 'center',
+          character: {
+            bold: false,
+            italic: false,
+            outline: false,
+            decoration: '',
+          },
+          font: {
+            size: 16,
+            family: 'arial',
+          },
+          color: 'white',
         },
+        padding: {
+          page: {
+            top: 0,
+            right: 0,
+            bottom: 0,
+            left: 0,
+          },
+          group: {
+            top: 0,
+            right: 0,
+            bottom: 0,
+            left: 0,
+          },
+        },
+        background: 'none',
       },
+      ...global.draw.v_$map(v => {
+        if (v instanceof Array)
+          return (arr => arr.length ? undefined : arr)(v.filter(v => v !== undefined));
+        else if (v instanceof Object)
+          return (obj => obj._len() ? undefined : obj)(v.v_$filter(v => v !== undefined));
+        else
+          return v;
+      }).v_$filter(v => v !== undefined),
       key: { // make customizable
         enabled: true,
         intervals: 10,
@@ -205,19 +230,22 @@ async function Paint(e) {
     body.qsa('body > .content > .easel > svg.paper:not(.template)')?.memRmv();
 
     const $svg = body.qs('body > .content > .easel').template('svg.paper');
-    $svg.style.background = global.draw.bg;
+    $svg.style.background = global.draw.background;
 
     const w_svg = settings.range.max - settings.range.min +
       settings.padding.page.left + settings.padding.page.right +
       settings.padding.group.left + settings.padding.group.right;
 
-    let h_svg = settings.padding.page.top + settings.text.size;
+    let h_svg = settings.padding.page.top + settings.text.font.size;
 
     let cali_i = 0;
 
     let typeOffset = 0;
     const { min, max } = settings.range;
     for (const group_i in global.groups) { // sorting by lines and calibrating height
+      if (currentRun != global.drawRun)
+        throw 'cancel';
+
       const group = global.groups[group_i];
 
       let hasData = false;
@@ -228,6 +256,9 @@ async function Paint(e) {
       settings.draw.y[group_i] = {};
 
       for (let type_i in group.d) {
+        if (currentRun != global.drawRun)
+          throw 'cancel';
+
         type_i = +type_i;
 
         const options = group.o[type_i];
@@ -241,7 +272,13 @@ async function Paint(e) {
 
         const height = options.l.h;
         await new Promise(r_read => {
+          if (currentRun != global.drawRun)
+            throw 'cancel';
+
           Lines(file, type, strand, min, max).then(async gen => {
+            if (currentRun != global.drawRun)
+              throw 'cancel';
+
             gen = gen();
             let lines;
             while (lines != 'done') {
@@ -277,13 +314,21 @@ async function Paint(e) {
             gen = undefined;
 
             r_read();
-          });
-        });
+          }).catch(err => { throw err; });
+        }).catch(err => { throw err; });
       }
 
       typeOffset += group.d.length;
       if (hasData)
         h_svg += settings.padding.group.top + settings.padding.group.bottom;
+
+      const dataFile = page.paintDisk.new(`${group_i}_data.json`, true);
+      await dataFile.write(settings.draw.d[group_i]);
+      settings.draw.d[group_i] = dataFile;
+
+      const locationFile = page.paintDisk.new(`${group_i}_location.json`, true);
+      await locationFile.write(settings.draw.l[group_i]);
+      settings.draw.l[group_i] = locationFile;
     }
 
     $notif.innerText = `Calibrating Line Positions...`;
@@ -294,6 +339,9 @@ async function Paint(e) {
       const temp = {};
       settings.draw.y = settings.draw.y.v_forEach(lines =>
         lines._forEach(([ l, h ]) => {
+          if (currentRun != global.drawRun)
+            throw 'cancel';
+
           temp[l] = y;
           y += h;
         })
@@ -328,7 +376,7 @@ async function Paint(e) {
     console.time('draw'); // temporary (for debug) - remove later
     console.profile('draw'); // temporary (for debug) - remove later
 
-    let y = settings.padding.page.top + settings.text.size;
+    let y = settings.padding.page.top + settings.text.font.size;
     if (settings.key.enabled && settings.key.position == 'top') {
       y += settings.key.sizes.text.true;
 
@@ -348,31 +396,41 @@ async function Paint(e) {
     }
 
     const dh_min = 1 / settings.resolution;
-    for (const [ group_i, data ] of settings.draw.d._ens()) {
+    for (const [ group_i, dataFile ] of settings.draw.d._ens()) {
+      if (currentRun != global.drawRun)
+        throw 'cancel';
+
+      const data = await dataFile.read();
+      console.log(data)
       if (data._len() == 0)
         continue;
 
       (function($text, name) {
-        $text.style.font = `${settings.text.size}px ${settings.text.font}`;
+        $text.style.font = `${settings.text.font.size}px`;
+        $text.style.fontFamily = settings.text.font.family;
+
+        $text.style.fontWeight = settings.text.character.bold ? 'bold' : 'normal';
+        $text.style.fontStyle = settings.text.character.italic ? 'italic' : 'normal';
+        $text.style.textDecoration = settings.text.character.decoration;
+
+        $text.style.outline = settings.text.character.outline ? '1px solid currentColor' : 'none';
 
         switch (settings.text.align) {
           case 'left': {
             $text.setAttr('text-anchor', 'start');
             $text.setAttr('x', `${(settings.padding.page.left + settings.padding.group.left) / w_svg * 100}%`);
             break;
-          };
-          default:
+          } default:
           case 'center': {
             $text.setAttr('text-anchor', 'middle');
             $text.setAttr('x', `${(settings.padding.page.left + settings.padding.group.left + w_svg -
               settings.padding.page.right - settings.padding.group.right) / w_svg * 50}%`);
             break;
-          };
-          case 'right': {
+          } case 'right': {
             $text.setAttr('text-anchor', 'end');
             $text.setAttr('x', `${(w_svg - settings.padding.page.right - settings.padding.group.right) / w_svg * 100}%`);
             break;
-          };
+          }
         }
 
         $text.setAttr('y', `${y / h_svg * 100}%`);
@@ -384,17 +442,31 @@ async function Paint(e) {
       y += settings.padding.group.top;
 
       const range = settings.draw.r[group_i];
+      const chunkLocs = await settings.draw.l[group_i].read();
       await new Promise(r_read => {
-        Lines(settings.draw.l[group_i], null, null, range.s, range.e, data._ks()).then(async gen => {
+        if (currentRun != global.drawRun)
+          throw 'cancel';
+
+        console.log(data)
+        Lines(chunkLocs, null, null, range.s, range.e, data._ks()).then(async gen => {
+          if (currentRun != global.drawRun)
+            throw 'cancel';
+
           gen = gen();
           let lines;
           while (lines != 'done') {
+            if (currentRun != global.drawRun)
+              throw 'cancel';
+
             await new Promise(
               r_gen => gen.next().then(({ value }) => {
                 lines = value;
                 r_gen();
               })
             );
+
+            if (currentRun != global.drawRun)
+              throw 'cancel';
 
             if (lines != 'done') {
               for (const [ line, s, e ] of lines) {
@@ -414,11 +486,11 @@ async function Paint(e) {
 
                 if (++count.rect >= 1000) { // copilot wants to try 10000 - not sure if this is a good idea - will try later
                   draw_i += count.rect;
-                  CreateSvgImage.call($svg, w_svg, h_svg, settings.resolution);
+                  CreateSvgImage.call($svg, h_svg, settings.resolution);
                   $notif.innerText = `Drawing... (${(draw_i + prandom() * 999 - 499 | 0).clamp(0)} lines)`;
 
                   count.rect = 0;
-                  if (++count.image >= 25) { // copilot wants to try 100 and 1000 - not sure if this is a good idea - will try later
+                  if (++count.image >= 20) { // copilot wants to try 100 and 1000 - not sure if this is a good idea - will try later
                     $svg.qsa('image:not(.template)').forEach(
                       $image => $image.style.display = ''
                     );
@@ -428,7 +500,7 @@ async function Paint(e) {
                       $notif.innerText = `Drawing... (${(draw_i + prandom() * 3999 - 1999 | 0).clamp(0)} lines)`;
                     });
 
-                    count.image = 1;
+                    count.image = 0;
                   }
                 }
               }
@@ -441,10 +513,16 @@ async function Paint(e) {
           gen = null;
 
           r_read();
-        });
-      });
+        }).catch(err => { throw err; });
+      }).catch(err => { throw err; });
 
-      (delete settings.draw.d[group_i]),(delete settings.draw.r[group_i]), (delete settings.draw.o[group_i]), (delete settings.draw.l[group_i]);
+      settings.draw.d[group_i].delete();
+      delete settings.draw.d[group_i];
+
+      settings.draw.l[group_i].delete();
+      delete settings.draw.l[group_i];
+
+      (delete settings.draw.r[group_i]), (delete settings.draw.o[group_i]);
 
       y += settings.padding.group.bottom;
     }
@@ -470,15 +548,15 @@ async function Paint(e) {
     }
 
     if ($svg.qs(':is(path, text):not(.template)'))
-      CreateSvgImage.call($svg, w_svg, h_svg, settings.resolution);
+      CreateSvgImage.call($svg, h_svg, settings.resolution);
 
-    await new Promise(r_merge => MergeSvgImages.call($svg, settings.resolution, r_merge, true));
+    await new Promise(r_merge => MergeSvgImages.call($svg, settings.resolution, r_merge));
 
     $svg.qsa('image:not(.template)').forEach($image => $image.style.display = '');
 
     requestIdleCallback(() => r_paint('done'));
-  }).then(
-    v => v == 'cancel' ? body.qsa('body > .content > .easel > svg.paper:not(.template)')?.memRmv() : $notif.innerText = 'Done!'
+  }).then(v =>
+    v == 'cancel' ? body.qsa('body > .content > .easel > svg.paper:not(.template)')?.memRmv() : $notif.innerText = 'Done!'
   );
 
   console.timeEnd('draw'); // temporary (for debug) - remove later
@@ -495,6 +573,9 @@ async function Paint(e) {
 
   global.update.pause.loose = false;
   global.update.pause.fixed = false;
+
+  page.paintDisk.wipe();
+  page.paintDisk = undefined;
 }
 
 /**
@@ -656,15 +737,17 @@ function CreateKey(anchor, y, h_svg, h, h_text, abbr, intr, { min, max }) {
  * @param {number} h - The height of the image.
  * @param {number} res - The scaling factor for paths and text.
  */
-function CreateSvgImage(w /* not sure if will need this */, h /* dont know why this is used */, res) { // poor code quality - contains parts might not necessary - fix
+function CreateSvgImage(h, res) { // poor code quality - contains parts might not necessary - fix
   this.qsa('text:not(.template)').forEach( // scale text
     $text =>  $text.style.fontSize = `${+($text.style.fontSize.replace('px') || '') / h * res}px`
   );
 
+  const url = SvgURL(this);
+
   const $image = this.template('image', false);
   $image.setAttrs('x', 'y', 0); // set image position
-  $image.setAttrs('width', 'height', res); // set image size
-  $image.setAttr('href', SvgURL(this)); // set image href
+  $image.setAttrs('width', 'height', '100%'); // set image size
+  $image.setAttr('href', url); // set image href
 
   this.qsa(':is(path, text, g):not(.template)')?.memRmv(); // remove paths and text
 
@@ -679,35 +762,34 @@ function CreateSvgImage(w /* not sure if will need this */, h /* dont know why t
  * @param {boolean} [final=false] - Indicates whether the merged image is the final image.
  * @returns {Promise<void>} - A promise that resolves when the merging is complete.
  */
-async function MergeSvgImages(res, r_merge, final = false) {
+async function MergeSvgImages(res, r_merge) {
   const $paper = document.createElement('canvas');
   const pen = $paper.getContext('2d');
 
   ($paper.width = res), ($paper.height = res); // set canvas size
 
-  let loaded = 0;
-  let $images = this.qsa('image:not(.template)').array();
-  await new Promise(r_$images => {
-    for (let $image of $images) {
-      const img = new Image(res, res);
-      img.src = $image.getAttr('href');
+  await Promise.all(this.qsa('image:not(.template)').map(function($image) {
+    const img = new Image(res, res);
+    img.src = $image.getAttr('href');
+    return new Promise(r_img => {
       img.onload = () => {
         pen.drawImage(img, 0, 0, res, res);
 
         img.memRmv();
         img.onload = undefined;
 
-        if (++loaded == $images.length)
-          r_$images();
+        r_img();
       };
-    }
-  });
+    });
+  }));
 
   $paper.toBlob(blob => {
+    const blobUrl = (URL || webkitURL || window).createObjectURL(blob, { type: 'image/svg+xml;charset=utf-8' });
+
     const $image = this.template('image', false);
     $image.setAttrs('x', 'y', 0); // set image position
-    $image.setAttrs('width', 'height', final ? '100%' : res); // set image size
-    $image.setAttr('href', URL.createObjectURL(blob, { type: 'image/svg+xml;charset=utf-8' })); // set image href
+    $image.setAttrs('width', 'height', '100%'); // set image size
+    $image.setAttr('href', blobUrl); // set image href
 
     $image.onload = () => {
       this.qsa('image:not(.template)').forEach($ => { // remove images and revoke object urls
@@ -718,7 +800,6 @@ async function MergeSvgImages(res, r_merge, final = false) {
       this.appendChild($image); // add image to svg
 
       $paper.memRmv();
-      $paper.toblob = undefined;
 
       $image.onload = undefined;
 
@@ -986,11 +1067,7 @@ function LinePreview($, keep = false) {
     $svg.style.transform = 'scale(0)';
     $svg.style.opacity = 0;
 
-    setTimeout(() => {
-      $svg?.memRmv();
-    }, getComputedStyle($svg).transitionDuration.split(/,\s/).map(
-      v => +new Function(`return ${v.replace(/ms/g, '').replace(/s/g, '* 1000')};`)()
-    ).max());
+    setTimeout(() => $svg?.memRmv(), parseTransition($svg).max());
 
     removeEventListener('mouseout', mouseEvent);
     $.gen(-2).removeEventListener('mouseover', mouseEvent);
@@ -1041,18 +1118,80 @@ function AreGroupsClean() {
   }
 }
 
-
 /**
  * Retrieves the auto group data.
  * @returns {string} The auto group data in JSON format.
  */
 function GetAutoGroup() {
-  return JSON.stringify({ data: global.data.v_$map(
-    types => (types ?? {}).v_$map(
-      strands => (strands ?? {})._ks().sort()
+  return JSON.stringify({ data: global.data.v_$map(types =>
+    (types ?? {}).v_$map(strands =>
+      (strands ?? {})._ks().sort()
     )
   ), groups: global.groups });
 }
+
+function UpdateSettingsTextPreview() {
+  (function($textStyle) {
+    const align = $textStyle.qs('.style.align > .content > .button.selected').classList.filter(v => v != 'button' && v != 'selected')[0];
+    const charStyles = $textStyle.qsa('.style.character > .content > .button.selected').map($ =>
+      $.classList.filter(v => v != 'button' && v != 'selected')[0]
+    );
+    const fontStyles = Object.fromEntries($textStyle.qsa('.style.font > .content > .option > input').map($ =>
+      [ $.id.replace('settings_text_', ''), $.value ]
+    ));
+
+    fontStyles.family = CSS.supports('font-family', fontStyles.family) ? fontStyles.family : 'arial';
+
+    (function($preview) {
+      $preview.style.fontWeight = 'normal';
+      $preview.style.fontStyle = 'normal';
+      $preview.style.outline = 'none';
+      $preview.style.textDecoration = 'none';
+
+      $preview.gen(-1).style.textAlign = align;
+      $preview.style.fontFamily = fontStyles.family;
+
+      (function(color) {
+        $preview.style.color = color;
+        $preview.gen(-1).style.background = InverseColorArrayShade(
+          [ ...parseColor(color).replace('#', '').match(/.{2}/g).map(v => parseInt(v, 16)), 255 ],
+          'var(--shade_d-3)',
+          'var(--shade_1-0)',
+        );
+      })(fontStyles.color);
+
+      const textDecoration = [];
+      charStyles.forEach(style => {
+        switch (style) {
+          case 'bold': {
+            $preview.style.fontWeight = 'bold';
+            break;
+          } case 'italic': {
+            $preview.style.fontStyle = 'italic';
+            break;
+          } case 'outline': {
+            $preview.style.outline = '1px solid currentColor';
+            break;
+          } case 'underline': {
+            textDecoration.push('underline');
+            break;
+          } case 'overline': {
+            textDecoration.push('overline');
+            break;
+          } case 'strike': {
+            textDecoration.push('line-through');
+            break;
+          }
+        }
+      });
+
+      $preview.style.textDecoration = textDecoration.join(' ');
+    })($textStyle.qs('.style.preview > span'));
+
+    page.events.get.settings_background.input.call(body.qs('body > .settings > .background > input'));
+  })(body.qs('body > .settings > .text_style > .content'));
+}
+setTimeout(UpdateSettingsTextPreview, 100);
 
 function CreateFileName() {
   return `SeqR_${TimeString().replace(', ', '_')}`;

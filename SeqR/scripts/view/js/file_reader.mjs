@@ -39,6 +39,7 @@ async function FileReader(e) {
 
   const lineSplitRegExps = {
     gff: new RegExp(/(?<=\S)\t(?=\S)/),
+    bed: new RegExp(/(?<=\S)\t(?=\S)/),
   };
 
   let chunks = {};
@@ -105,7 +106,6 @@ async function FileReader(e) {
             ).filter(
               v => v != ''
             ));
-            console.log(fileSaveNames.last().metaData.last());
 
             r('done');
           }).then(
@@ -166,6 +166,62 @@ async function FileReader(e) {
               delete chunkCaches[type];
           })
         )
+    },
+    bed: function(line) {
+      if (rejected)
+        return;
+
+      ++lineNum;
+      if (line[0] == '#' || line.startsWith('browser') || line.startsWith('track')) // comment defintions should only be at the start of the line
+        return
+
+      let [ chrom, start, end, , , strand ] = line.split(lineSplitRegExps.bed);
+
+      const length = start.length + end.length + (++evalLineNum).toString().length + 2;
+
+      const numify = str => str == '.' ? undefined : +str;
+      (start = numify(start)), (end = numify(end));
+
+      if (start < global.dataRange[0])
+        global.dataRange[0] = start;
+      if (end > global.dataRange[1])
+        global.dataRange[1] = end;
+
+      cacheTotal += length;
+
+      chunkCaches[chrom] ??= {};
+      chunkCaches[chrom][strand] ??= [];
+      chunkCaches[chrom][strand].push({ v: { s: start, e: end, n: evalLineNum }, l: length });
+
+      if (cacheTotal >= global.settings.readerCacheMax)
+        chunkCaches._forEach(
+          ([ chrom, caches ]) => caches._$map(
+            ([ k, v ]) => [ k, v.reduce((sum, { v: { s, e, n }, l }) => [ // function
+              `${sum[0]}\n${n} ${s} ${e}`,
+              [ min(sum[1][0], s), max(sum[1][1], e) ],
+              sum[2] + l ],
+              [ '', [ Infinity, -Infinity ], 0 ] // start value
+            ) ]
+          )._sort(
+            ([ , v_a ], [ , v_b ]) => v_b[2] - v_a[2]
+          ).forEach(([ k, [ v, range, len ] ]) => {
+            if (cacheTotal <= global.settings.readerCacheMin)
+              return;
+
+            cacheTotal -= len;
+
+            chunks[chrom] ??= {};
+            chunks[chrom][k] ??= [];
+            chunks[chrom][k].push({
+              u: URL.createObjectURL(new Blob([ v.slice(1) ])).replace('blob:',' ').trim(),
+              r: range
+            });
+
+            delete chunkCaches[chrom][k];
+            if (chunkCaches[chrom]._len() == 0)
+              delete chunkCaches[chrom];
+          })
+        )
     }
   };
 
@@ -174,6 +230,27 @@ async function FileReader(e) {
      * Clears cache .gff/.gft/.gff3 files.
      */
     gff: function() {
+      cacheTotal = 0;
+      chunkCaches = chunkCaches._$filter(
+        ([ type, caches ]) => void(caches._$map(
+          ([ k, v ]) => [ k, v.reduce((sum, { v: { s, e, n } }) => [ // function
+            `${sum[0]}\n${n} ${s} ${e}`,
+            [ min(sum[1][0], s), max(sum[1][1], e) ] ],
+            [ '', [ Infinity, -Infinity ] ] // start value
+          ) ]
+        )._$filter(([ k, [ v, range ] ]) => {
+          chunks[type] ??= {};
+          chunks[type][k] ??= [];
+          chunks[type][k].push({
+            u: URL.createObjectURL(new Blob([ v.slice(1) ])).replace('blob:',' ').trim(), // u = url
+            r: range
+          });
+
+          return;
+        }))
+      );
+    },
+    bed: function() {
       cacheTotal = 0;
       chunkCaches = chunkCaches._$filter(
         ([ type, caches ]) => void(caches._$map(
@@ -209,12 +286,14 @@ async function FileReader(e) {
       const decoder = new TextDecoder();
       for (const file of files) {
         const extension = parseExtension(file.name.splitOnLast('.')[1]);
-        if (![ 'gff' ].includes(extension)) {
+        if (![ 'gff', 'bed' ].includes(extension)) {
           body.qsa('.bad_extension_warning').memRmv();
 
           const $warning = body.appendChild('notification');
           $warning.addClass('bad_extension_warning');
-          $warning.innerHTML = `File <code>${file.name}</code> is not a supported extension!<br><br>Supported Extensions: <code>.gff</code>, <code>.gft</code>, <code>.gff3</code>`;
+          $warning.innerHTML = `File <code>${file.name}</code> is not a supported extension!<br><br>Supported Extensions: ${[ 'gff', 'gft', 'gff3', 'bed' ].map(v =>
+            `<code>.${v}</code>`
+          ).join(', ')}`;
 
           setTimeout(() => {
             $warning.style.animation = 'NotificationOut 500ms ease-in 0s 1 normal forwards';
@@ -274,12 +353,17 @@ async function FileReader(e) {
               case 'gff': {
                 chunk.forEach(handlers.gff);
                 break;
+              } case 'bed': {
+                chunk.forEach(handlers.bed);
+                break;
               } default: {
                 body.qsa('.bad_extension_warning').memRmv();
 
                 const $warning = body.appendChild('notification');
                 $warning.addClass('bad_extension_warning');
-                $warning.innerHTML = `File <code>${file.name}</code> is not a supported extension!<br><br>Supported Extensions: <code>.gff</code>, <code>.gft</code>, <code>.gff3</code>`;
+                $warning.innerHTML = `File <code>${file.name}</code> is not a supported extension!<br><br>Supported Extensions: ${[ 'gff', 'gft', 'gff3', 'bed' ].map(v =>
+                  `<code>.${v}</code>`
+                ).join(', ')}`;
 
                 setTimeout(() => {
                   $warning.style.animation = 'NotificationOut 500ms ease-in 0s 1 normal forwards';
@@ -340,7 +424,7 @@ async function FileReader(e) {
           ({ name, metaData }) => (function($file) {
             $file.setAttr('metadata', JSON.stringify(metaData));
             $file.rmvClass('hide');
-          })(body.qs(`body > .top > .files > .file:not(.template)[raw-name='${name}']`))
+          })(body.qs(`body > .top > .files > .file:not(.template)[process-name='${name}']`))
         );
         break;
       } case 'cancel':
@@ -348,7 +432,7 @@ async function FileReader(e) {
         rejected = true;
         fileSaveNames.forEach(({ name }) => {
           delete global.data[name];
-          body.qs(`body > .top > .files > .file:not(.template)[raw-name='${name}']`)?.memRmv();
+          body.qs(`body > .top > .files > .file:not(.template)[process-name='${name}']`)?.memRmv();
         });
         break;
       }
@@ -361,5 +445,6 @@ function parseExtension(str) {
     gff: 'gff',
     gft: 'gff',
     gff3: 'gff',
+    bed: 'bed',
   }[str.toLowerCase()];
 }

@@ -54,12 +54,7 @@ page.events = new Events({
         $.removeEventListener('load', events.get.line_settings.load[0]);
         $.removeEventListener('load', events.get.line_settings.load[1]);
 
-        const cs = getComputedStyle($);
-        setTimeout(() => $.src = 'about:blank',
-          cs.transitionDuration.split(/,\s/).map(
-            v => +new Function(`return ${v.replace(/ms/g, '').replace(/s/g, '* 1000')};`)()
-          ).max()
-        );
+        setTimeout(() => $.src = 'about:blank', parseTransition($).max());
       })(body.qs('body > iframe.line_settings'));
 
       body.qs('body > .cover').addClass('hide');
@@ -67,6 +62,7 @@ page.events = new Events({
       this.removeEventListener('message', events.get.window.message);
     },
     mousedown: function(e) {
+      page.mouseDownOver = e.target;
       if (e.target) {
         const cs = getComputedStyle(e.target);
         if (cs.webkitUserSelect != 'none' || cs.userSelect != 'none')
@@ -87,22 +83,20 @@ page.events = new Events({
         body.qs( // time
           'body > .side > .content > .groups > .group:not(.template) > .content > .data:not(.template) > .content'
         ).gen(-Infinity, 0).flat(Infinity).map(
-          $ => $ instanceof Element ? getComputedStyle($).transitionDuration.split(/\s/).map(
-            v => +new Function(`return ${v.replace(/ms/g, '').replace(/s/g, '* 1000')};`)()
-          ).max() : 0
+          $ => $ instanceof Element ? parseTransition($).max() : 0
         ).max()
       );
     },
-    click: [
+    mouseup: [
       [
         function(e) {
           [
-            { selector: 'body > .top > .delete_data.button > svg.confirm', hideOnClick: true },
+            { selector: 'body > .top > .delete_data.button > .confirm', hideOnClick: true },
             { selector: 'body > .top > .export.extensions' },
             { selector: 'body > .top > .export.name' },
             { selector: 'body > .data_select' },
             { selector: 'body > .line_settings:not(.hide)', extra: 'line_setttings' },
-            { selector: 'body > .cover', checks: [ 'body > .data_select', 'body > .line_settings:not(.hide)', 'body > .settings' ], hideOnClick: true, capture: true },
+            { selector: 'body > .cover', checks: [ 'body > .data_select', 'body > .line_settings:not(.hide)', { selector: 'body > .settings', hide: true } ], hideOnClick: true, capture: true },
           ].forEach(
             ({ selector, $class, checks, hideOnClick, capture, extra }) => (function($) {
               $class ??= 'hide';
@@ -111,7 +105,10 @@ page.events = new Events({
                 return;
 
               const $e = e.target || e.srcElement || $;
-              if ((hideOnClick || !$e.childOf($)) && checks.every(selector => !$e.childOf(body.qs(selector)))) {
+              if (!page.mouseDownOver.childOf($e, true) && !$e.childOf(page.mouseDownOver, true))
+                return;
+
+              if ((hideOnClick || !$e.childOf($)) && checks.every(selector => !$e.childOf(body.qs(selector.selector ?? selector), true))) {
                 if (capture)
                   e?.stopPropagation();
 
@@ -119,18 +116,21 @@ page.events = new Events({
                   requestAnimationFrame(() => $.addClass($class));
 
                 $.addClass($class);
+                checks.forEach(check => {
+                  if (check instanceof Object) {
+                    if (check.hide)
+                      body.qs(check.selector).addClass('hide');
+                  }
+                });
 
                 switch (extra) {
                   case 'line_setttings': {
                     $.removeEventListener('load', events.get.line_settings.load[0]);
                     $.removeEventListener('load', events.get.line_settings.load[1]);
 
-                    const cs = getComputedStyle($);
-                    setTimeout(() => $.src = 'about:blank',
-                      cs.transitionDuration.split(/\s/).map(
-                        v => +new Function(`return ${v.replace(/ms/g, '').replace(/s/g, '* 1000')};`)()
-                      ).max()
-                    );
+                    setTimeout(() => $.src = 'about:blank', parseTransition($).max());
+
+                    break;
                   };
                 }
               }
@@ -160,7 +160,7 @@ page.events = new Events({
   radio: {
     click:
     function(e) {
-      this.gen(-1).qsa(`.selected[radio_group='${this.getAttr('radio-group')}']`).forEach(
+      this.gen(-1).qsa(`.selected[radio-group='${this.getAttr('radio-group')}']`).forEach(
         $ => $.rmvClass('selected')
       );
 
@@ -237,7 +237,7 @@ page.events = new Events({
   },
   delete_data: {
     click: function(e) {
-      body.qs('body > .top > .delete_data.button > svg.confirm').rmvClass('hide');
+      body.qs('body > .top > .delete_data.button > .confirm').rmvClass('hide');
     },
   },
   delete_data_confirm: {
@@ -645,8 +645,58 @@ page.events = new Events({
         else
           this.rmvClass('cancel');
       } else {
-        body.qs('body > .settings.prompt').rmvClass('hide');
-        body.qs('body > .settings.prompt > top').scrollIntoView();
+        (function($settings) {
+          (function($selection) {
+            $selection.qs('.range > .min').innerText = global.dataRange[0];
+            $selection.qs('.range > .max').innerText = global.dataRange[1];
+
+            (function([ $min, $max ]) {
+              $min.value = global.draw.range.min ?? global.dataRange[0];
+              $max.value = global.draw.range.max ?? global.dataRange[1];
+
+              const div = v => ((v - global.dataRange[0]) / (global.dataRange[1] - global.dataRange[0]));
+              const min = div((+$min.value).clamp(...global.dataRange));
+              const max = div((+$max.value).clamp(...global.dataRange));
+
+              $selection.qs('.range > .shading').style.left = `${(min * 100)}%`;
+              $selection.qs('.range > .shading').style.width = `${((max - min) * 100)}%`;
+            })($selection.qsa('.inputs > input:is(.min, .max)').array());
+          })($settings.qs('.selection'));
+
+          (function($textStyle) {
+            events.get.radio.click.call($textStyle.qs(`.style.align > .content > .button.${global.draw.text.align ?? 'center'}`));
+
+            (function($character) {
+              $character.qs('.button.bold').setClass('selected', global.draw.text.character.bold);
+              $character.qs('.button.italic').setClass('selected', global.draw.text.character.italic);
+              $character.qs('.button.outline').setClass('selected', global.draw.text.character.outline);
+
+              $character.qs('.button.underline').setClass('selected', global.draw.text.character.decoration?.includes('underline'));
+              $character.qs('.button.overline').setClass('selected', global.draw.text.character.decoration?.includes('overline'));
+              $character.qs('.button.strike').setClass('selected', global.draw.text.character.decoration?.includes('strike'));
+            })($textStyle.qs('.style.character > .content'));
+
+            (function($font) {
+              $font.qs('.option.size > input').value = global.draw.text.font.size ?? '';
+              $font.qs('.option.color > input').value = global.draw.text.color ?? '#ffffff';
+              $font.qs('.option.family > input').value = global.draw.text.font.family ?? '';
+            })($textStyle.qs('.style.font > .content'));
+          })($settings.qs('.text_style > .content'));
+
+          (function($padding) {
+            global.draw.padding.page._forEach(([ k, v ]) =>
+              $padding.qs(`.page > .content > .option.${k} > input`).value = v ?? ''
+            );
+            global.draw.padding.group._forEach(([ k, v ]) =>
+              $padding.qs(`.group > .content > .option.${k} > input`).value = v ?? ''
+            );
+          })($settings.qs('.padding'));
+
+          $settings.qs('.background > .preview').style.background = global.draw.background ?? '';
+
+          $settings.rmvClass('hide');
+          $settings.scrollTo(0, 0);
+        })(body.qs('body > .settings'));
 
         body.qs('body > .cover').rmvClass('hide');
       }
@@ -660,8 +710,8 @@ page.events = new Events({
       const selectX_1 = ($shading.rect().x - this.rect().x) / this.clientWidth;
       const selectX_2 = selectX_1 + $shading.clientWidth / this.clientWidth;
 
-      let d_1 = Math.abs(x - selectX_1);
-      let d_2 = Math.abs(x - selectX_2);
+      let d_1 = (x - selectX_1).abs();
+      let d_2 = (x - selectX_2).abs();
 
       if (selectX_1 == selectX_2) {
         if (x < selectX_1)
@@ -686,18 +736,32 @@ page.events = new Events({
     mouseup: function(e) {
       const $shading = this.qs('.shading');
 
-      const x = ((e.clientX - this.rect().x) / this.clientWidth).clamp(0, 1);
-      let selectX_1 = ($shading.rect().x - this.rect().x) / this.clientWidth;
-      let selectX_2 = selectX_1 + $shading.clientWidth / this.clientWidth;
+      const { x: this_x, w: this_w } = this.rect();
+      const { x: shading_x } = $shading.rect();
+
+      const x = ((e.clientX - this_x) / this_w).clamp(0, 1);
+      let min = ((shading_x - this_x) / this_w).clamp(0, 1);
+      let max = (min + $shading.clientWidth / this.clientWidth).clamp(0, 1);
 
       if (this.getAttr('closest') == 'min')
-        selectX_1 = x;
+        min = x;
       else
-        selectX_2 = x;
+        max = x;
 
-      body.qsa('body > .settings.prompt > .selection > .inputs > input[type=number]:is(.min, .max)').forEach(
-        $ => (($.hasClass('min') ? $.value = selectX_1 : $.value = selectX_2) * (global.dataRange[1] - global.dataRange[0]) + global.dataRange[0]).cl()
-      );
+      if (min > max) {
+        const oppopsite = this.getAttr('closest') == 'min' ? 'max' : 'min';
+        this.setAttr('closest', oppopsite);
+        this.gen(-1).setAttr('lastChange', oppopsite);
+      }
+
+      (function($inputs) {
+        const mult = v => (v * (global.dataRange[1] - global.dataRange[0]) + global.dataRange[0]).rnd();
+        $inputs.qs('input[type=number].min').value = mult(min);
+        $inputs.qs('input[type=number].max').value = mult(max);
+      })(body.qs('body > .settings.prompt > .selection > .inputs'));
+
+      $shading.style.left = `${(min * 100)}%`;
+      $shading.style.width = `${((max - min) * 100)}%`;
     },
   },
   settings_select_min: {
@@ -718,95 +782,90 @@ page.events = new Events({
     },
     blur: '_this.settings_select_min.blur',
   },
+  settings_character_style: {
+    click: function(e) {
+      this.tglClass('selected');
+      UpdateSettingsTextPreview();
+    },
+  },
+  settings_text_align: {
+    click: UpdateSettingsTextPreview,
+  },
+  settings_text_family: {
+    input: UpdateSettingsTextPreview,
+  },
+  settings_background: {
+    input: function(e) {
+      const color = (color =>
+        color.toLowerCase().replace(/\s/g, '') == 'currentcolor' ?
+          body.qs('body > .settings > .text_style > .content > .style.font > .content > .option.color > input[type="color"]').value :
+          color
+      )(this.value || this.placeholder || 'none');
+
+      body.qs('body > .settings > .background > .preview').style.background = CSS.supports('background', color) ?
+        color :
+        (color =>
+          CSS.supports('background', color) ? color : ''
+        )(color.replace(/\s/g, ''));
+    },
+  },
   settings_save: {
-    click: async function(e) {
-      let failed = false;
-      let minMax = Object.fromEntries(body.qsa('body > .settings.prompt > .selection > .inputs > input[type=number]:is(.min, .max)').map($ => {
-        if (Number.isNaN(+$.value)) {
-          body.qs('body > .settings.prompt > .button.save').addClass('disabled');
-          failed = true;
-        }
+    click: function(e) {
+      (function($settings) {
+        const settingify = setting => setting === '' || (typeof setting == 'number' && Number.isNaN(setting)) ? undefined : setting;
 
-        const max = +$.hasClass('max');
-        return [ max ? 'max' : 'min', +($.value || $.placeholder || global.dataRange[max]) ];
-      }));
+        global.draw = {
+          range: {
+            min: settingify((+$settings.qs('.selection > .inputs > input.min').value).clamp(...global.dataRange)),
+            max: settingify((+$settings.qs('.selection > .inputs > input.max').value).clamp(...global.dataRange)),
+          },
+          text: { // add position modifier
+            align: settingify($settings.qs('.text_style > .content > .style.align > .content > .button.selected').classList.filter(v =>
+              v != 'selected' && v != 'button'
+            )[0]),
+            character: {
+              bold: $settings.qs('.text_style > .content > .style.character > .content > .button.bold').hasClass('selected'),
+              italic: $settings.qs('.text_style > .content > .style.character > .content > .button.italic').hasClass('selected'),
+              outline: $settings.qs('.text_style > .content > .style.character > .content > .button.outline').hasClass('selected'),
+              decoration: $settings.qsa('.text_style > .content > .style.character > .content > .button:is(.underline, .overline, .strike).selected').map($ =>
+                $.classList.filter(v => v != 'selected' && v != 'button')[0]
+              ).join(' '),
+            },
+            font: {
+              size: settingify($settings.qs('.text_style > .content > .style.font > .content > .option.size > input').value),
+              family: settingify($settings.qs('.text_style > .content > .style.font > .content > .option.family > input').value),
+            },
+            color: settingify($settings.qs('.text_style > .content > .style.font > .content > .option.color > input').value),
+          },
+          padding: {
+            page: Object.assign(
+              { top: 0, right: 0, bottom: 0, left: 0 },
+              Object.fromEntries($settings.qsa('.padding > .page > .content > .option > input').map($ =>
+                [ $.id.replace('settings_padding_page_', ''), settingify((+$.value).clamp(0)) ]
+              ))
+            ),
+            group: Object.assign(
+              { top: 0, right: 0, bottom: 0, left: 0 },
+              Object.fromEntries($settings.qsa('.padding > .group > .content > .option > input').map($ =>
+                [ $.id.replace('settings_padding_group_', ''), settingify((+$.value).clamp(0)) ]
+              ))
+            ),
+          },
+          background: settingify($settings.qs('.background > .preview').style.background),
+        };
 
-      if (failed) {
-        body.qsa('body > .bad_view_range_warning').memRmv();
+        $settings.addClass('hide');
+      })(body.qs('body > .settings'));
 
-        const $warning = body.appendChild('notification');
-        $warning.addClass('bad_view_range_warning');
-        $warning.innerHTML = 'Error saving settings! Invalid view range!';
-
-        return setTimeout(function() {
-          $warning.style.animation = 'NotificationOut 500ms ease-in 0s 1 normal forwards';
-          events.add($warning, 'notification');
-        }, 5000);
-      }
-
-      if (minMax.min > minMax.max) {
-        if (body.qs('body > .settings.prompt > .selection').getAttr('lastChange') == 'min')
-          minMax.max = minMax.min;
-        else
-          minMax.min = minMax.max;
-      }
-
-      global.draw.range.min = body.qs('body > .settings.prompt > .selection > .inputs > input[type=number].min').value &&= minMax.min.cl();
-      global.draw.range.max = body.qs('body > .settings.prompt > .selection > .inputs > input[type=number].max').value &&= minMax.max.cl();
-
-      global.draw.text.align = body.qs('body > .settings.prompt > .text_style > .align > .button.selected').innerHTML.toLowerCase();
-      ({ size: [ 'font-size', '16', 'px' ], color: [ 'color', 'white' ], font: [ 'font-family', 'arial' ] })._forEach(([ k, [ cssAttr, placeholder, mod = '' ] ]) => {
-        const $ = body.qs(`.settings.prompt > .text_style > .other > .${k}`);
-        global.draw.text[k] = $.value = CSS.supports(cssAttr, `${$.value || $.placeholder || placeholder}${mod}`) ? $.value : '';
-      });
-
-      [ 'page', 'group' ].forEach(k_1 => {
-        global.draw.padding[k_1].k_forEach(k_2 => {
-          const $ = body.qs(`.settings.prompt > .padding > .${k_1} > .${k_2}`);
-          global.draw.padding[k_1][k_2] = $.value = CSS.supports('padding', `${$.value || $.placeholder || 0}px`) ? $.value : '';
-        });
-      });
-
-      const $bg = body.qs('body > .settings.prompt > .background > input[type=text]');
-      global.draw.bg = $bg.value = CSS.supports('background', $bg.value || $bg.placeholder || 'none') ? $bg.value : '';
-
-      const $paper = body.qs('body > .content > .easel > svg.paper'); // ???
-      if ($paper) // ???
-        $paper.style.background = global.draw.bg; // ???
-
-      body.qs('body > .settings').addClass('hide');
       body.qs('body > .cover').addClass('hide');
 
-      Paint(e);
+      Paint();
     },
   },
   settings_cancel: {
     click: function(e) {
-      body.qs('body > .settings.prompt > .selection > .inputs > input[type=number].min').value = global.draw.range.min;
-      body.qs('body > .settings.prompt > .selection > .inputs > input[type=number].max').value = global.draw.range.max;
-
-      body.qs('body > .settings.prompt > .text > .align > .button')[(function(i) {
-        return i == -1 ? 1 : i
-      })(body.qs('body > .settings.prompt > .text_style > .align > .button.selected').map($ => {
-        $button.rmvClass('selected');
-        return $;
-      }).findIndex(
-        $ => $.innerHTML.toLowerCase() == global.draw.text.align
-      ))].addClass('selected');
-
-      [ 'size', 'color', 'font' ].forEach(
-        k => body.qs(`.settings.prompt > .text_style > .other > .${k}`).value = global.draw.text[k]
-      );
-
-      [ 'page', 'group' ].forEach(
-        k_1 => global.padding[k_1].k_forEach(
-          k_2 => body.qs(`.settings.prompt > .padding > .${k_1} > .${k_2}`).value = global.padding[k_1][k_2]
-        )
-      );
-
-      body.qs('body > .settings.prompt > .background > input[type=text]').value = global.draw.bg;
-
-      body.qs('body > .easel > svg.paper').style.background = global.draw.bg; // ???
+      body.qs('body > .settings').addClass('hide');
+      body.qs('body > .cover').addClass('hide');
     },
   },
   export: {

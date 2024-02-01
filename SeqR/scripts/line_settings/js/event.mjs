@@ -54,9 +54,7 @@ page.events = new Events({
           () => DeleteFixedUpdate(id)
         ),
         body.qs('body > .preview > svg.easel').gen(-Infinity, 0).flat(Infinity).map(
-          $ => $ instanceof Element ? getComputedStyle($).transitionDuration.split(/\s/).map(
-            v => +new Function(`return ${v.replace(/ms/g, '').replace(/s/g, '* 1000')};`)()
-          ).max() : 0
+          $ => $ instanceof Element ? parseTransition($).max() : 0
         ).max()
       );
     },

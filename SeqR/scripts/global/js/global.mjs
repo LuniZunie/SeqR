@@ -31,6 +31,8 @@ export {
   Prandom,
   PrandomGenerator,
   IsValidURL,
+  parseColor,
+  parseTransition,
   timedFetch,
   GetAttributesObject,
   ColorArrayToColor,
@@ -45,6 +47,7 @@ export {
   DeleteFixedUpdate,
   Events,
   Tooltip,
+  Disk,
 };
 
 const doc = document.documentElement;
@@ -148,31 +151,39 @@ const global = {
     },
   },
   draw: {
-    bg: '#000',
-    text: {
-      align: '',
-      size: '',
-      color: '',
-      font: '',
+    range: {
+      min: undefined,
+      max: undefined,
+    },
+    text: { // add position modifier
+      align: undefined,
+      character: {
+        bold: undefined,
+        italic: undefined,
+        outline: undefined,
+        decoration: undefined,
+      },
+      font: {
+        size: undefined,
+        family: undefined,
+      },
+      color: undefined,
     },
     padding: {
       page: {
-        top: '',
-        right: '',
-        bottom: '',
-        left: '',
+        top: undefined,
+        right: undefined,
+        bottom: undefined,
+        left: undefined,
       },
       group: {
-        top: '',
-        right: '',
-        bottom: '',
-        left: '',
+        top: undefined,
+        right: undefined,
+        bottom: undefined,
+        left: undefined,
       },
     },
-    range: {
-      min: '',
-      max: '',
-    },
+    background: undefined,
   },
   data: {
     /* 'temp_file1.gff': {
@@ -275,6 +286,7 @@ const global = {
     ],
   },
   drawReject: undefined,
+  drawRun: 0,
   dataRange: [ Infinity, -Infinity ],
   clipboard: {
     type: undefined,
@@ -294,9 +306,74 @@ const global = {
       fixed: false,
       loose: false,
     }
-  }
+  },
+  disk: null,
+  pagePromises: [],
 };
 global.prandom.generator = PrandomGenerator(global.prandom.seed);
+
+async function LoadInsertedDocuments() {
+  let $inserts;
+  while (($inserts = document.qsa('insert')).length)
+    await Promise.all($inserts.map(async $ => {
+      switch ($.getAttr('type')) {
+        case 'text/html': {
+          await fetch($.getAttr('src')).then(r => r.text()).then(t => {
+            const $div = document.createElement('div');
+            $div.innerHTML = t;
+            $div.childNodes.forEach($child => $.parentNode.prependChild($child, $));
+
+            $.memRmv();
+            $div.memRmv();
+          });
+          break;
+        } case 'text/plain': {
+          await fetch($.getAttr('src')).then(r => r.text()).then(t => {
+            $.parentNode.prependChild(document.createTextNode(t), $);
+            $.memRmv();
+          });
+          break;
+        } case 'dictionary/html': {
+          await fetch($.getAttr('src')).then(r => r.text()).then(t => {
+            const $div = document.createElement('div');
+            $div.innerHTML = t;
+
+            const obj = Object.fromEntries($div.childNodes.filter($ =>
+              $.tagName == 'ENTRY'
+            ).map($ => [ $.qs('key:last-of-type').innerText, $.qs('value:last-of-type').innerHTML ]));
+
+            $.getAttr('key').split(',').forEach(k => {
+              const $div = document.createElement('div');
+              $div.innerHTML = obj[k];
+
+              $div.childNodes.forEach($child => $.parentNode.prependChild($child, $));
+              $div.memRmv();
+            });
+
+            $.memRmv();
+          });
+          break;
+        } case 'dictionary/plain': {
+          await fetch($.getAttr('src')).then(r => r.text()).then(t => {
+            const $div = document.createElement('div');
+            $div.innerHTML = t;
+
+            const obj = Object.fromEntries($div.childNodes.filter($ =>
+              $.tagName == 'ENTRY'
+            ).map($ => [ $.qs('key:last-of-type').innerText, $.qs('value:last-of-type').innerText ]));
+
+            $.getAttr('key').split(',').forEach(k => {
+              $.parentNode.prependChild(document.createTextNode(obj[k]), $);
+            });
+
+            $.memRmv();
+          });
+          break;
+        }
+      }
+    }));
+}
+requestAnimationFrame(() => global.pagePromises.push(LoadInsertedDocuments()));
 
 Object.defineProperty(global.extensions.gff, 'evalEscChars', {
   enumerable: false,
@@ -401,6 +478,22 @@ function IsValidURL(url) {
   } catch (_) {
     return false;
   }
+}
+
+function parseColor(color) {
+  const pen = document.createElement('canvas').getContext('2d');
+  pen.fillStyle = color;
+  color = pen.fillStyle;
+
+  pen.canvas.memRmv();
+
+  return color;
+}
+
+function parseTransition($) {
+  return getComputedStyle($).transitionDuration.split(/,\s/).map(
+    v => +new Function(`return ${v.replace(/ms/g, '').replace(/s/g, '* 1000')};`)()
+  );
 }
 
 function timedFetch(url, options, timeout = 10000) {
@@ -508,12 +601,12 @@ function PrandomColorArray(seed = global.prandom.seed, i = global.prandom.color_
  * @param {Array} colors - The array of colors.
  * @returns {string} - The inverse color shade.
  */
-function InverseColorArrayShade(color) {
-  return `linear-gradient(45deg, ${
-    ColorArrayToColor(color, true).replace(/[^0-9,]/g, '').split(',').map(v => +v).max() < 128 ?
-      'var(--shade_c-0), var(--shade_e-0)' :
-      'var(--shade_3-0), var(--shade_1-0)'
-  })`;
+function InverseColorArrayShade(
+  color,
+  color_1 = 'linear-gradient(45deg, var(--shade_c-0), var(--shade_e-0))',
+  color_2 = 'linear-gradient(45deg, var(--shade_3-0), var(--shade_1-0))'
+) {
+  return ColorArrayToColor(color, true).replace(/[^0-9,]/g, '').split(',').map(v => +v).max() < 128 ? color_1 : color_2;
 }
 
 /**
@@ -623,16 +716,15 @@ function DrawSvgLine(style, x_1, y_1, x_2, y_2, limit) {
             const x_1 = (x_i).clamp(0);
             const x_w = (x_i + h * 2).clamp(0, w) - x_1;
             points = points.concat([
-              'M', x_1 + x, y ,
-              'h', x_w ,
+              'M', x_1 + x, y,
+              'h', x_w,
               'v', h ,
               'h', -x_w
             ]);
           }
 
           return points;
-        };
-        case 'short_dash': {
+        } case 'short_dash': {
           let points = [];
 
           let left = (h * 2 - w % (h * 2)) / 2;
@@ -648,8 +740,7 @@ function DrawSvgLine(style, x_1, y_1, x_2, y_2, limit) {
           }
 
           return points;
-        };
-        case 'dotted': { // rewrite
+        } case 'dotted': { // rewrite
           let points = [];
 
           let left = (h * 2 - w % (h * 2)) / 2;
@@ -666,8 +757,7 @@ function DrawSvgLine(style, x_1, y_1, x_2, y_2, limit) {
           }
 
           return points;
-        };
-        case 'double':
+        } case 'double':
           return [
             'M', x, y,
             'L', x + w, y,
@@ -722,9 +812,17 @@ function DrawSvgLine(style, x_1, y_1, x_2, y_2, limit) {
         case 'none':
           return [];
         case 'in':
-          return [
+          return invert ? [
+            'M', x, y,
+            'L', x + w * 3/4, y + h / 2,
+            'L', x, y + h,
+
+            'L', x, y + h * 3/2,
+            'L', x + w * 3/2, y + h / 2,
+            'L', x, y - h / 2,
+          ] : [
             'M', x, y - h / 2,
-            'L', x + w * 3/2, y / 2,
+            'L', x + w * 3/2, y + h / 2,
             'L', x, y + h * 3/2,
 
             'L', x, y + h,
@@ -732,19 +830,31 @@ function DrawSvgLine(style, x_1, y_1, x_2, y_2, limit) {
             'L', x, y,
           ];
         case 'out':
-          return [
+          return invert ? [
             'M', x + w * 3/2, y - h / 2,
-            'L', x, y / 2,
+            'L', x, y + h / 2,
             'L', x + w * 3/2, y + h * 3/2,
 
             'L', x + w * 3/2, y + h,
             'L', x + w * 3/4, y + h / 2,
             'L', x + w * 3/2, y,
+          ] : [
+            'M', x + w * 3/2, y,
+            'L', x + w * 3/4, y + h / 2,
+            'L', x + w * 3/2, y + h,
+
+            'L', x + w * 3/2, y + h * 3/2,
+            'L', x, y + h / 2,
+            'L', x + w * 3/2, y - h / 2,
           ];
         case 'block_in':
-          return [
+          return invert ? [
+            'M', x, y + h * 3/2,
+            'L', x + w * 3/2, y + h / 2,
+            'L', x, y - h / 2,
+          ] : [
             'M', x, y - h / 2,
-            'L', x + w * 3/2, y / 2,
+            'L', x + w * 3/2, y + h / 2,
             'L', x, y + h * 3/2,
           ];
         case 'block_out':
@@ -806,12 +916,18 @@ function DrawSvgLine(style, x_1, y_1, x_2, y_2, limit) {
             ...f(0, 1, 2/3, 5/3),
           ];
         case 'circle':
-          return [
+          return invert ? [
             'M', x - w / 3, y + h / 2,
             'Q', x - w / 3, y + h * 4/3, x + w / 2, y + h * 4/3,
             'Q', x + w * 4/3, y + h * 4/3, x + w * 4/3, y + h / 2,
             'Q', x + w * 4/3, y - h / 3, x + w / 2, y - h / 3,
             'Q', x - w / 3, y - h / 3, x - w / 3, y + h / 2,
+          ] : [
+            'M', x + w / 2, y - h / 3,
+            'Q', x + w * 4/3, y - h / 3, x + w * 4/3, y + h / 2,
+            'Q', x + w * 4/3, y + h * 4/3, x + w / 2, y + h * 4/3,
+            'Q', x - w / 3, y + h * 4/3, x - w / 3, y + h / 2,
+            'Q', x - w / 3, y - h / 3, x + w / 2, y - h / 3,
           ];
           return [
             ...m(-1/3, 1/2),
@@ -934,14 +1050,15 @@ function DrawSvgLine(style, x_1, y_1, x_2, y_2, limit) {
     none: 0,
     in: { default: h * 3/4, dashed: h * 3/2, short_dash: h * 3/2, dotted: h * 3/2 },
     out: { default: h * 3/2, double: h * 3/4 },
-    block_in: { default: h / 4, dashed: h, short_dash: h, dotted: h },
-    block_out: h,
-    embedded_in: h - 1,
-    embedded_out: h - 1,
+    block_in: h / 4,
+    block_out: h * 3/2,
+    embedded_in: h,
+    embedded_out: h,
     solid: h / 2 - 1,
     dashed: h * 2/3,
+    circle: h,
     dotted: h * 2/3,
-    double: h - 1,
+    double: h,
   };
 
   bodyChanges._forEach(([ k, v ]) => {
@@ -1543,3 +1660,586 @@ class Tooltip {
     tooltip.style.top = `${y}px`;
   }
 }
+
+function EvalKeyPath(kPath) {
+  try {
+    const regex = /(\w+)|\['([^']+?)'\]|\["([^"]+?)"\]|\[`([^`]+?)`\]/g;
+    let match;
+
+    const path = [];
+    while ((match = regex.exec(kPath)) !== null)
+      (function([ v, i ]) {
+        const char = { 1: "'", 2: "'", 3: '"', 4: '`' }[i];
+        console.log(v, i, char)
+        path.push(new Function(`return ${char}${v}${char};`)());
+      })(match.map((v, i) => i && bool(v) ? [ v, i ] : null).filter(v => v !== null)[0]);
+
+    return path;
+  } catch (err) {
+    console.error(err);
+    return;
+  }
+}
+
+class VFile {
+  #disk;
+
+  #file;
+  #name;
+  #extension;
+  constructor(disk, file) {
+    const [ name, extension ] = (function(file) {
+      if (file.length == 1)
+        return [ file, 'txt' ];
+
+      const extension = file.pop();
+      return [ file.join('.'), extension ];
+    })(file.split('.'));
+
+    this.#disk = disk;
+
+    this.#file = file;
+    this.#name = name;
+    this.#extension = extension;
+  }
+
+  get disk() {
+    return this.#disk;
+  }
+
+  get file() {
+    return this.#file;
+  }
+  get name() {
+    return this.#name;
+  }
+  get extension() {
+    return this.#extension;
+  }
+
+  async delete() {
+    this.#disk.delete(this.#file);
+  }
+};
+
+class VTextFile extends VFile {
+  #url;
+  constructor(disk, file) {
+    super(disk, file);
+
+    this.#url = URL.createObjectURL(new Blob([ '' ], { type: 'text/plain' })).replace('blob:', '');
+  }
+
+  get type() {
+    return 'text/plain';
+  }
+
+  get url() {
+    return `blob:${this.#url}`;
+  }
+
+  async read() {
+    return await fetch(
+      `blob:${this.#url}`,
+      { cache: 'no-store' }
+    ).then(async function(response) {
+      let content = '';
+
+      const decoder = new TextDecoder();
+      await (await response.blob()).stream().pipeTo(new WritableStream({
+        write: chunk => content += decoder.decode(chunk)
+      }));
+
+      return content;
+    });
+  }
+
+  async readAll() {
+    return await this.read().then(content => content.split('\n'));
+  }
+
+  async readLine(line) {
+    if (line % 1 != 0)
+      throw `Line ${line} is not a valid line number!`;
+
+    return (await this.readAll())[line];
+  }
+
+  async readLines(...lines) {
+    if (lines.some(line => line % 1 != 0))
+      throw `Some lines are not valid line numbers!`;
+
+    return (await this.readAll()).filter((_, i) => lines.includes(i));
+  }
+
+  async readRange(start, end) {
+    if (start % 1 != 0 || end % 1 != 0)
+      throw `Some lines are not valid line numbers!`;
+
+    return (await this.readAll()).slice(start, end + 1);
+  }
+
+  async readRanges(...ranges) {
+    if (ranges.some(([ start, end ]) => start % 1 != 0 || end % 1 != 0))
+      throw `Some lines are not valid line numbers!`;
+
+    return (content =>
+      ranges.map(([ start, end ]) => content.slice(start, end + 1))
+    )(await this.readAll());
+  }
+
+  async readRangesFlat(...ranges) {
+    if (ranges.some(([ start, end ]) => start % 1 != 0 || end % 1 != 0))
+      throw `Some lines are not valid line numbers!`;
+
+    return (await this.readAll()).filter((_, i) =>
+      ranges.some(([ start, end ]) => i >= start && i <= end)
+    );
+  }
+
+  #write = async function(handler) {
+    const file = this;
+    return await this.readAll().then(function(content) {
+      URL.revokeObjectURL(`blob:${file.#url}`);
+
+      file.#url = URL.createObjectURL(new Blob([
+        handler.call(file, content).join('\n')
+      ], { type: 'text/plain' })).replace('blob:', '');
+    });
+  };
+
+  async write(str) {
+    return await this.#write(() => str.split('\n'));
+  }
+
+  async writeLine(str, line) {
+    return await this.#write(content => {
+      if (line % 1 != 0)
+        throw `Line ${line} is not a valid line number!`;
+
+      content[line] = str;
+      return content;
+    });
+  }
+
+  async writeLines(str, ...paths) {
+    return await this.#write(content => {
+      paths.forEach(line => {
+        if (line % 1 != 0)
+          throw `Line ${line} is not a valid line number!`;
+
+        content[line] = str;
+      });
+
+      return content;
+    });
+  }
+
+  async writeRange(str, start, end) {
+    return await this.#write(content => {
+      if (start % 1 != 0 || end % 1 != 0)
+        throw `Some lines are not valid line numbers!`;
+
+      for (let i = start; i <= end; i++)
+        content[i] = str;
+
+      return content;
+    });
+  }
+
+  async writeRanges(str, ...ranges) {
+    return await this.#write(content => {
+      if (ranges.some(([ start, end ]) => start % 1 != 0 || end % 1 != 0))
+        throw `Some lines are not valid line numbers!`;
+
+      ranges.forEach(([ start, end ]) => {
+        for (let i = start; i <= end; i++)
+          content[i] = str;
+      });
+
+      return content;
+    });
+  }
+
+  async overwriteRange(str, start, end) {
+    return await this.#write(content => {
+      if (start % 1 != 0 || end % 1 != 0)
+        throw `Some lines are not valid line numbers!`;
+
+      content.splice(start, end - start + 1, str);
+      return content;
+    });
+  }
+
+  async overwriteRanges(str, ...ranges) {
+    return await this.#write(content => {
+      if (ranges.some(([ start, end ]) => start % 1 != 0 || end % 1 != 0))
+        throw `Some lines are not valid line numbers!`;
+
+      ranges.forEach(([ start, end ]) => {
+        for (let i = start; i <= end; i++) {
+          if (i == start)
+            content[i] = str;
+          else
+            content[i] = undefined;
+        }
+      });
+
+      return content.filter(line => line !== undefined);
+    });
+  }
+
+  async append(str) {
+    return await this.#write(content =>
+      (content.join('\n') + str).split('\n')
+    );
+  }
+
+  async appendLine(str) {
+    return await this.#write(content =>
+      [ ...content, str ]
+    );
+  }
+
+  async prepend(str) {
+    return await this.#write(content =>
+      (str + content.join('\n')).split('\n')
+    );
+  }
+
+  async prependLine(str) {
+    return await this.#write(content =>
+      [ str, ...content ]
+    );
+  }
+
+  async insertBefore(str, ...paths) {
+    return await this.#write(content => {
+      paths.forEach(line => {
+        if (line % 1 != 0)
+          throw `Line ${line} is not a valid line number!`;
+
+        content.splice(line, 0, str);
+      });
+
+      return content;
+    });
+  }
+
+  async insertAfter(str, ...paths) {
+    return await this.#write(content => {
+      paths.forEach(line => {
+        if (line % 1 != 0)
+          throw `Line ${line} is not a valid line number!`;
+
+        content.splice(line + 1, 0, str);
+      });
+
+      return content;
+    });
+  }
+
+  async deleteLine(line) {
+    return await this.#write(content => {
+      if (line % 1 != 0)
+        throw `Line ${line} is not a valid line number!`;
+
+      content.splice(line, 1);
+      return content;
+    });
+  }
+
+  async deleteLines(...lines) {
+    return await this.#write(content => {
+      if (lines.some(line => line % 1 != 0))
+        throw `Some lines are not valid line numbers!`;
+
+      lines.sort((a, b) => b - a).forEach(line =>
+        content.splice(line, 1)
+      );
+      return content;
+    });
+  }
+
+  async deleteRange(start, end) {
+    return await this.#write(content => {
+      if (start % 1 != 0 || end % 1 != 0)
+        throw `Some lines are not valid line numbers!`;
+
+      content.splice(start, end - start + 1);
+      return content;
+    });
+  }
+
+  async deleteRanges(...ranges) {
+    return await this.#write(content => {
+      if (ranges.some(([ start, end ]) => start % 1 != 0 || end % 1 != 0))
+        throw `Some lines are not valid line numbers!`;
+
+      return content.filter((_, i) =>
+        !ranges.some(([ start, end ]) => i >= start && i <= end)
+      );
+    });
+  }
+};
+
+class VJSONFile extends VFile {
+  #url;
+  constructor(disk, file) {
+    super(disk, file);
+
+    this.#url = URL.createObjectURL(new Blob([ '' ], { type: 'application/json' })).replace('blob:', '');
+  }
+
+  get type() {
+    return 'application/json';
+  }
+
+  get url() {
+    return `blob:${this.#url}`;
+  }
+
+  async readRaw() {
+    return await fetch(
+      `blob:${this.#url}`,
+      { cache: 'no-store' }
+    ).then(async function(response) {
+      let content = '';
+
+      const decoder = new TextDecoder();
+      await (await response.blob()).stream().pipeTo(new WritableStream({
+        write: chunk => content += decoder.decode(chunk)
+      }));
+
+      return content;
+    });
+  }
+
+  async read(){
+    return await this.readRaw().then(content => JSON.parse(content || '{}'));
+  }
+
+  async readPath(path) {
+    return await this.read().then(content =>
+      (new Function('obj', `return obj${path[0] == '.' || path[0] == '[' ? '' : '.'}${path};`).bind(content))(content)
+    );
+  }
+
+  async readPaths(...paths) {
+    return (content => {
+      const obj = {};
+      let objPath;
+      paths.map(path => {
+        let currentObj = content;
+        objPath = obj;
+        EvalKeyPath(path).map((k, i, arr) => {
+          currentObj = currentObj[k];
+
+          if (i == arr.length - 1)
+            objPath[k] = currentObj;
+          else
+            objPath = objPath[k] = {};
+        });
+      });
+
+      return obj;
+    })(await this.read());
+  }
+
+  async readPathsFlat(...paths) {
+    return (content =>
+      paths.map(path =>
+        (new Function('obj', `return obj${path[0] == '.' || path[0] == '[' ? '' : '.'}${path};`).bind(content))(content)
+      )
+    )(await this.read());
+  }
+
+  #write = async function(handler) {
+    const file = this;
+    return await this.read().then(function(content) {
+      URL.revokeObjectURL(`blob:${file.#url}`);
+      file.#url = URL.createObjectURL(new Blob([
+        JSON.stringify(handler.call(file, content))
+      ], { type: 'application/json' })).replace('blob:', '');
+    });
+  };
+
+  async write(obj) {
+    return await this.#write(() => obj);
+  }
+
+  async writePath(v, path) {
+    return await this.#write(content => {
+      new Function('obj', 'v', `obj${path[0] == '.' || path[0] == '[' ? '' : '.'}${path} = v;`)(content, v);
+      return content;
+    });
+  }
+
+  async writePaths(v, ...paths) {
+    return await this.#write(content => {
+      paths.forEach(path =>
+        new Function('obj', 'v', `obj${path[0] == '.' || path[0] == '[' ? '' : '.'}${path} = v;`)(content, v)
+      );
+
+      return content;
+    });
+  }
+
+  async assign(obj) { // rewrite
+    URL.revokeObjectURL(`blob:${this.#url}`);
+    this.#url = URL.createObjectURL(new Blob([
+      JSON.stringify(Object.assign(await this.read(), obj))
+    ], { type: 'application/json' })).replace('blob:', '');
+  }
+
+  async deletePath(path) {
+    return await this.#write(content => {
+      new Function('obj', `delete obj${path[0] == '.' || path[0] == '[' ? '' : '.'}${path};`)(content);
+      return content;
+    });
+  }
+
+  async deletePaths(...paths) {
+    return await this.#write(content => {
+      paths.forEach(path =>
+        new Function('obj', `delete obj${path[0] == '.' || path[0] == '[' ? '' : '.'}${path};`)(content)
+      );
+
+      return content;
+    });
+  }
+};
+
+class Disk {
+  #files = {};
+  new(file, overwrite) {
+    if (this.#files[file] && !overwrite)
+      throw `File ${file} already exists! Overwrite file is set to OFF`;
+    else {
+      if (this.#files[file])
+        URL.revokeObjectURL(`blob:${this.#files[file].url}`);
+
+      switch ({ txt: 'text/plain', json: 'application/json' }[file.split('.').pop()]) {
+        default:
+        case 'text/plain':
+          return this.#files[file] = new VTextFile(this, file);
+        case 'application/json':
+          return this.#files[file] = new VJSONFile(this, file);
+      }
+    }
+  }
+  load(file) {
+    if (this.#files[file])
+      return this.#files[file];
+    else
+      throw `File ${file} does not exist!`;
+  }
+  delete(file) {
+    if (this.#files[file]) {
+      URL.revokeObjectURL(`blob:${this.#files[file].url}`);
+      delete this.#files[file];
+    } else
+      throw `File ${file} does not exist!`;
+  }
+  wipe() {
+    this.#files.k_forEach(file =>
+      this.delete(file)
+    );
+  }
+  get files() {
+    return structuredClone(this.#files);
+  }
+};
+global.disk = new Disk();
+
+/* async function diskTest() {
+  const disk = new Disk();
+
+  await (async function(file) {
+    await file.write('3: Write');
+
+    await file.writeLine('5: Write Line', 1);
+    await file.writeLines('6-7: Write Lines', 2, 3);
+
+    await file.writeRange('9-10: Write Range', 4, 7);
+    await file.writeRanges('11-13,15-17: Write Ranges', [ 7, 9 ], [ 11, 13 ]);
+
+    await file.overwriteRange('8: Overwrite Range', 4, 5);
+    await file.overwriteRanges('11-12,14-15: Overwrite Ranges', [ 10, 11 ], [ 13, 14 ]);
+
+    await file.append(' 17: Append');
+    await file.appendLine('18: Append Lines');
+
+    await file.prepend('3: Prepend ');
+    await file.prependLine('1: Prepend Line');
+
+    await file.insertBefore('2: Insert Before', 1);
+    await file.insertAfter('4: Insert After', 2);
+
+    console.log(await file.read());
+    console.log(await file.readLine(1));
+    console.log(await file.readLines(2, 3));
+    console.log(await file.readRange(4, 6));
+    console.log(await file.readRanges([7, 12], [ 8, 15 ]));
+    console.log(await file.readRangesFlat([ 7, 12 ], [ 8, 15 ]));
+
+    await file.deleteLine(1);
+    await file.deleteLines(2, 3);
+    await file.deleteRange(4, 6);
+    await file.deleteRanges([7, 12], [ 8, 13 ]);
+
+    console.log(await file.readAll());
+    console.log(await file.read());
+
+    console.log(file.url);
+  })(disk.new('test.txt'));
+
+  await (async function(file) {
+    await file.write({ a: 1, b: [5, {a: 6}, 5], c: 3 });
+
+    await file.writePath(4, 'd');
+    await file.writePaths(5, 'e', 'f');
+
+    console.log(await file.read());
+    console.log(await file.readPath('a'));
+    console.log(await file.readPaths('b[1]', 'c'));
+    console.log(await file.readPathsFlat('b', 'c'));
+
+    await file.deletePath('a');
+    await file.deletePaths('d', 'c');
+
+    console.log(await file.readRaw());
+
+    console.log(file.url);
+  })(disk.new('test.json'));
+
+  disk.wipe();
+}
+diskTest(); */
+
+/* const Sandbox = {};
+Object.defineProperty(Sandbox, 'test', {
+  enumerable: false,
+  value: function(code, scope) {
+    let $sandbox = body.qs('#sandbox') ?? body.appendChild('iframe#sandbox');
+    $sandbox.style.display = 'none';
+
+    return (function(contentWindow) {
+      const $script = contentWindow.document.createElement('script');
+      $script.textContent = `
+        window.sandbox = (function() {
+          'use strict';
+
+          return (${code});
+        }).call(${JSON.stringify(scope)});
+      `;
+      contentWindow.document.head.appendChild($script);
+
+      return contentWindow.sandbox;
+    })($sandbox.contentWindow);
+  },
+});
+
+setTimeout(() =>
+console.log(Sandbox.test('window.top', {}))
+, 1000); */

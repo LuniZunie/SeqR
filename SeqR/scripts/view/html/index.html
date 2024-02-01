@@ -1,0 +1,330 @@
+<!--
+  Copyright 2024 Cedric Hotopp
+
+  Licensed under the Apache License, Version 2.0 (the 'License');
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an 'AS IS' BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+-->
+
+<!--
+  <path d='M18.5 15c-2.483 0-4.5 2.015-4.5 4.5s2.017 4.5 4.5 4.5 4.5-2.015 4.5-4.5-2.017-4.5-4.5-4.5zm2.5 5h-2v2h-1v-2h-2v-1h2v-2h1v2h2v1zm-7.18 4h-12.82v-24h8.409c4.857 0 3.335 8 3.335 8 3.009-.745 8.256-.419 8.256 3v2.501c-.771-.322-1.614-.501-2.5-.501-3.584 0-6.5 2.916-6.5 6.5 0 1.747.696 3.331 1.82 4.5zm-.252-23.925c2.202 1.174 5.938 4.883 7.432 6.881-1.286-.9-4.044-1.657-6.091-1.179.222-1.468-.185-4.534-1.341-5.702z'/>
+ -->
+
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>SeqR</title>
+    <link rel='icon' href='../../../assets/icons/favicon.ico'/>
+
+    <meta charset='utf-8'/>
+    <meta name='description' content='SeqR'/>
+    <meta name='keywords' content='SeqR, RNA, DNA, Sequencer, Sequence, RNA Sequencer, DNA Sequencer, Biology, GFT, GFF, GFF3'/>
+    <meta name='author' content='Cedric Hotopp'/>
+    <meta name='viewport' content='width=device-width, initial-scale=1'/>
+
+    <link rel='stylesheet' href='../../global/css/global.css'/>
+
+    <script type='module' src='../../global/js/prototypes.mjs'></script>
+    <script type='module' src='../../global/js/global.mjs'></script>
+
+    <link rel='stylesheet' href='../css/main.css'/>
+
+    <script type='module' src='../js/file_reader.mjs' defer></script>
+    <script type='module' src='../js/main.mjs' defer></script>
+    <script type='module' src='../js/event.mjs' defer></script>
+
+    <noscript>Your browser does not support JavaScript! This website will not work without JavaScript!</noscript>
+  </head>
+  <body>
+    <div class='top section'>
+      <input type='file' accept='.gff,.gff3,.gft' multiple events='file_picker' name='import_file_selector'/>
+      <div class='import button'>
+        <svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>
+          <path d='M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4'/>
+          <polyline points='7 10 12 15 17 10'/>
+          <line x1='12' y1='15' x2='12' y2='3'/>
+        </svg>
+
+        <svg class='cancel_icon' fill='none' stroke='currentColor' clip-rule='evenodd' fill-rule='evenodd' stroke-linejoin='round' stroke-miterlimit='2' viewBox='0 0 24 24'>
+          <line x1='18' y1='6' x2='6' y2='18'/>
+          <line x1='6' y1='6' x2='18' y2='18'/>
+        </svg>
+      </div>
+      <div class='delete_data button disabled' events='delete_data'>
+        <svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>
+          <polyline points='3 6 5 6 21 6'/>
+          <path d='M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2'/>
+        </svg>
+
+        <svg class='cancel_icon' fill='none' stroke='currentColor' clip-rule='evenodd' fill-rule='evenodd' stroke-linejoin='round' stroke-miterlimit='2' viewBox='0 0 24 24'>
+          <line x1='18' y1='6' x2='6' y2='18'/>
+          <line x1='6' y1='6' x2='18' y2='18'/>
+        </svg>
+
+        <br/><svg class='confirm hide' fill='currentColor' fill-rule='evenodd' clip-rule='evenodd' viewBox='0 0 24 24' events='delete_data_confirm'>
+          <path d='M19 24h-14c-1.104 0-2-.896-2-2v-17h-1v-2h6v-1.5c0-.827.673-1.5 1.5-1.5h5c.825 0 1.5.671 1.5 1.5v1.5h6v2h-1v17c0 1.104-.896 2-2 2zm0-19h-14v16.5c0 .276.224.5.5.5h13c.276 0 .5-.224.5-.5v-16.5zm-7 7.586l3.293-3.293 1.414 1.414-3.293 3.293 3.293 3.293-1.414 1.414-3.293-3.293-3.293 3.293-1.414-1.414 3.293-3.293-3.293-3.293 1.414-1.414 3.293 3.293zm2-10.586h-4v1h4v-1z'/>
+        </svg>
+      </div>
+
+      <span class='files auto_scroll' scroll-overflow-background='#000' scroll-speed='1.5'>
+        <span class='file select template' events='file'></span>
+      </span>
+
+      <div class='draw button disabled' events='draw'>
+        <svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>
+          <rect x='3' y='3' width='18' height='18' rx='2' ry='2'/>
+          <circle cx='8.5' cy='8.5' r='1.5'/>
+          <polyline points='21 15 16 10 5 21'/>
+        </svg>
+
+        <svg class='cancel_icon' fill='none' stroke='currentColor' clip-rule='evenodd' fill-rule='evenodd' stroke-linejoin='round' stroke-miterlimit='2' viewBox='0 0 24 24'>
+          <line x1='18' y1='6' x2='6' y2='18'/>
+          <line x1='6' y1='6' x2='18' y2='18'/>
+        </svg>
+      </div>
+      <div class='export button disabled' events='export'>
+        <svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>
+          <path d='M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4'/>
+          <polyline points='17 8 12 3 7 8'/>
+          <line x1='12' y1='3' x2='12' y2='15'/>
+        </svg>
+
+        <svg class='cancel_icon' fill='none' stroke='currentColor' clip-rule='evenodd' fill-rule='evenodd' stroke-linejoin='round' stroke-miterlimit='2' viewBox='0 0 24 24'>
+          <line x1='18' y1='6' x2='6' y2='18'/>
+          <line x1='6' y1='6' x2='18' y2='18'/>
+        </svg>
+      </div>
+      <div class='export extensions hide' events='export_extensions'>
+        <div class='button extension selected' extension='image/png' radio-group='export_extension' events='radio'>PNG</div>
+        <div class='button extension' extension='image/jpeg' radio-group='export_extension' events='radio'>JPG</div>
+        <div class='button extension' extension='image/webp' radio-group='export_extension' events='radio'>WEBP</div>
+        <div class='button extension' extension='image/svg+xml' radio-group='export_extension' events='radio'>SVG</div>
+      </div>
+      <div class='export name hide'>
+        <input type='text' placeholder='File name: <time>' name='export_file_name' events='export_name'/>
+        <span class='sub_text'>
+          <small events='export_name_sub_text'>Press enter to submit</small>
+        </span>
+      </div>
+    </div>
+
+    <div class='file_data_list'>
+      <div class='file_data template'>
+        <span class='raw name select'>&lt;Raw Name&gt;</span><span class='raw extension select'>.ext</span><br/>
+        <span class='process name select'>&lt;Process Name&gt;</span><span class='process extension select'>.ext</span><br/>
+        <h4 class='title'>Metadata</h4>
+        <div class='metadata'>
+          <span class='datum select hide template'></span>
+        </div>
+      </div>
+    </div>
+
+    <div class='settings prompt hide' hash='settings' events='settings_save'>
+      <top></top>
+      <div class='text'>
+        <h1 style='font-size: 2.75em;'>Settings</h1>
+      </div>
+      <div class='selection section'>
+        <div class='text'>
+          <h1>View Range</h1>
+        </div>
+        <div class='range' events='settings_select_range'>
+          <span class='min'></span>
+          <span class='max'></span>
+          <div class='shading'></div>
+        </div><br/>
+        <div class='inputs'>
+          <input type='number' class='min' events='settings_select_min' name='settings_selection_range_minimum'/>
+          <input type='number' class='max' events='settings_select_max' name='settings_selection_range_maximum'/>
+        </div>
+      </div>
+      <div class='text_style section'>
+        <div class='text'>
+          <h1>Text Style</h1>
+        </div>
+        <div class='align'>
+          <div class='text'>
+            <h2>Align</h2>
+          </div>
+          <div class='button left' radio-group='settings_text_align' events='radio'>Left</div>
+          <div class='button center selected' radio-group='settings_text_align' events='radio'>Center</div>
+          <div class='button right' radio-group='settings_text_align' events='radio'>Right</div>
+        </div>
+        <div class='other'>
+          <div class='text'><h3>Size:</h3></div><input type='number' class='size' min='0' placeholder='16' name='settings_text_size'/>
+          <div class='text'><h3>Color:</h3></div><input type='text' class='color' min='0' placeholder='white' name='settings_text_color'/>
+          <div class='text'><h3>Font:</h3></div><input type='text' class='font' min='0' placeholder='arial' name='settings_text_font'/>
+        </div>
+      </div>
+      <div class='padding section'>
+        <div class='text'><h1>Padding</h1></div>
+        <div class='page'>
+          <div class='text'><h2>Page</h2></div>
+          <input type='number' class='top' min='0' placeholder='0' name='settings_padding_page_top'/>
+          <input type='number' class='right' min='0' placeholder='0' name='settings_padding_page_right'/>
+          <input type='number' class='bottom' min='0' placeholder='0' name='settings_padding_page_bottom'/>
+          <input type='number' class='left' min='0' placeholder='0' name='settings_padding_page_left'/>
+          <p>Top</p>
+          <p>Right</p>
+          <p>Bottom</p>
+          <p>Left</p>
+        </div>
+        <div class='group'>
+          <div class='text'><h2>Group</h2></div>
+          <input type='number' class='top' min='0' placeholder='0' name='settings_padding_group_top'/>
+          <input type='number' class='right' min='0' placeholder='0' name='settings_padding_group_right'/>
+          <input type='number' class='bottom' min='0' placeholder='0' name='settings_padding_group_bottom'/>
+          <input type='number' class='left' min='0' placeholder='0' name='settings_padding_group_left'/>
+          <p>Top</p>
+          <p>Right</p>
+          <p>Bottom</p>
+          <p>Left</p>
+        </div>
+      </div>
+      <div class='background section'>
+        <div class='text'>
+          <h1>
+            Background
+            <small style='font-size: 0.5em'>
+              <a href='https://www.w3schools.com/colors/colors_names.asp' target='_blank'>1</a>
+              <a href='https://www.w3schools.com/css/css3_colors.asp' target='_blank'>2</a>
+              <a href='https://www.w3schools.com/cssref/css3_pr_background.php' target='_blank'>3</a>
+            </small>
+          </h1>
+        </div>
+        <input type='text' placeholder='none' name='settings_background'/><br/>
+      </div>
+    </div>
+
+    <div class='side section'>
+      <div class='top'>
+        <div class='hide_border'></div>
+        <div class='text'>
+          <h1>Groups</h1>
+        </div>
+      </div>
+      <div class='content section'>
+        <div class='button add' events='add_group'>
+          <svg fill='none' stroke='currentColor' clip-rule='evenodd' fill-rule='evenodd' stroke-linejoin='round' stroke-miterlimit='2' stroke-width='2' viewBox='0 0 24 24'>
+            <line x1='3' y1='12' x2='21' y2='12'/>
+            <line x1='12' y1='3' x2='12' y2='21'/>
+          </svg>
+        </div>
+        <div class='button auto disabled' events='auto_group'>
+          <svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>
+            <rect x='4' y='4' width='16' height='16' rx='2' ry='2'/>
+            <rect x='9' y='9' width='6' height='6'/>
+            <line x1='9' y1='1' x2='9' y2='4'/>
+            <line x1='15' y1='1' x2='15' y2='4'/>
+            <line x1='9' y1='20' x2='9' y2='23'/>
+            <line x1='15' y1='20' x2='15' y2='23'/>
+            <line x1='20' y1='9' x2='23' y2='9'/>
+            <line x1='20' y1='14' x2='23' y2='14'/>
+            <line x1='1' y1='9' x2='4' y2='9'/>
+            <line x1='1' y1='14' x2='4' y2='14'/>
+          </svg>
+        </div>
+        <div class='button clean disabled' events='clean_groups'>
+          <svg viewBox='0 0 32 32' fill='currentColor' stroke-linecap='round' stroke-linejoin='round'>
+            <path class="linesandangles_een" d="M26.281,30l-2-8H25v-5h-8V2h-2v15H7v5h0.719l-2,8H26.281z M23.719,28H21v-4h-2v4h-2v-4h-2v4h-2 v-4h-2v4H8.281l1.5-6h12.438L23.719,28z M9,19h14v1H9V19z"/>
+          </svg>
+        </div>
+        <div class='button remove_all disabled' events='remove_all_groups'>
+          <svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>
+            <polyline points='3 6 5 6 21 6'/>
+            <path d='M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2'/>
+          </svg>
+        </div>
+        <div class='groups section' events='groups'>
+          <div class='group template' group-index='?'>
+            <div class='backdrop main'></div>
+            <div class='backdrop circle upper'></div>
+            <div class='backdrop circle lower'></div>
+            <div class='content' events='group'>
+              <p class='name auto_scroll select' contenteditable spellcheck='false' events='group_name' hide-sidebars='true'>Group &lt;#&gt;</p>
+
+              <div class='data template'>
+                <span class='content button hide_scrollbar' events='group_data'>
+                  <span class='tab'></span>
+                  <span class='strand'></span>
+                  <span class='type'></span>
+                  <span class='file'></span>
+                  <span class='tab'></span>
+                </span>
+                <div class='paste button disabled' events='group_data_paste'>
+                  <svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>
+                    <path d='M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2'/>
+                    <rect x='8' y='2' width='8' height='4' rx='1' ry='1'/>
+                  </svg>
+                </div>
+                <div class='copy button' events='group_data_copy'>
+                  <svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>
+                    <rect x='8' y='7' width='13' height='16' rx='2' ry='2'/>
+                    <path d='M5 18H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1'/>
+
+                  </svg>
+                </div>
+              </div>
+
+              <div class='edit disabled button' events='group_edit'>
+                <svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>
+                  <path d='M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z'/>
+                </svg>
+              </div>
+              <div class='format disabled button' events='group_format'>
+                <svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>
+                  <path d='M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z'/>
+                </svg>
+              </div>
+              <div class='remove button' events='group_remove'>
+                <svg fill='none' stroke='currentColor' clip-rule='evenodd' fill-rule='evenodd' stroke-linejoin='round' stroke-miterlimit='2' stroke-width='2' viewBox='0 0 24 24'>
+                  <line x1='4' y1='12' x2='20' y2='12'/>
+                </svg>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class='data_select section hide'>
+      <div class='content' events='data_select'>
+        <div class='file section template'>
+          <p class='label auto_scroll'></p>
+          <div class='type section template'>
+            <p class='label'><span class='text hide_scrollbar' events='data_select_type_label'></span></p>
+            <div class='strand button template' events='data_select_strand'>+</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class='previews'>
+      <svg class='preview template'>
+        <path class='template' fill-rule='nonzero'/>
+      </svg>
+    </div>
+
+    <iframe class='line_settings hide'></iframe>
+
+    <div class='content'>
+      <div class='easel'>
+        <svg class='paper template'>
+          <text class='template'/>
+          <path class='template' fill-rule='nonzero'/>
+          <image class='template' style='display: none'/>
+        </svg>
+      </div>
+    </div>
+
+    <div class='cover hide'></div>
+  </body>
+</html>

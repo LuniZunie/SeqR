@@ -1,0 +1,1558 @@
+/*
+  Copyright 2024 Cedric Hotopp
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+*/
+
+body {
+  --top_height: 7vh;
+  --side_width: 30vw;
+}
+
+body > .loading_screen {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 100vw;
+  height: 100vh;
+
+  background: inherit;
+
+  z-index: 2147483647;
+
+  transition: all 500ms;
+}
+
+body > .loading_screen.hide {
+  pointer-events: none;
+
+  opacity: 0;
+}
+
+body > .loading_screen > svg {
+  aspect-ratio: 1/1;
+
+  position: absolute;
+  left: calc(50% - 12.5vmin);;
+  top: calc(50% - 12.5vmin);
+  width: 25vmin;
+
+  color: var(--text_1);
+
+  animation: rotate360Clockwise 1.5s linear infinite;
+}
+
+body > .top {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: calc(100vw - var(--side_width) - 2vmin);
+  height: calc(var(--top_height) - 2px);
+
+  padding: 0.5vmin;
+
+  background: var(--shade_0-0);
+
+  border-bottom: 2px solid var(--shade_0-3); /* try 2px solid var(--shade_2-0) */
+
+  z-index: 2;
+}
+
+body > .top > * {
+  line-height: calc(var(--top_height) - 2px);
+}
+
+body > .top > input[type=file] {
+  pointer-events: none;
+
+  position: fixed;
+  left: calc(var(--file_picker_left) + var(--file_picker_width) + 0.5vw);
+  width: 10vw;
+
+  padding-right: 0.5vw;
+
+  opacity: 0;
+}
+
+body > .top > input[type=file]::file-selector-button,
+body > .top > input[type=file]::-webkit-file-upload-button {
+  pointer-events: all;
+  cursor: pointer;
+
+  position: fixed;
+  left: var(--file_picker_left);
+  top: var(--file_picker_top);
+  width: var(--file_picker_width);
+  height: var(--file_picker_height);
+
+  line-height: calc(var(--top_height) - 2px);
+
+  border-radius: 0.5vmin;
+}
+
+body > .top > :is(.import, .delete_data, .draw, .export).button {
+  aspect-ratio: 3/2;
+
+  position: absolute;
+  top: 1.5vh;
+  height: calc(var(--top_height) - 2px - 2vh);
+
+  border-radius: 0.5vmin;
+
+  text-align: center;
+  line-height: calc(var(--top_height) - 2px - 2vh);
+
+  background: var(--shade_2-0);
+
+  transition: all 250ms;
+}
+
+body > .top > :is(.import, .delete_data, .draw, .export).button.disabled {
+  pointer-events: none;
+
+  background: transparent;
+
+  filter: brightness(0.1);
+}
+
+body > .top > :is(.import, .delete_data, .draw, .export).button svg {
+  aspect-ratio: 1/1;
+
+  position: relative;
+  top: 12.5%;
+  height: 75%;
+}
+
+body > .top > :is(.import, .delete_data, .draw, .export).button:hover:not(:has(.confirm:hover)),
+body > .top > input[type=file]:hover ~ .import.button {
+  background: var(--hover_color);
+
+  filter: brightness(1.2);
+}
+
+body > .top > :is(.import, .delete_data, .draw, .export).button:hover:active:not(:has(.confirm:hover:active)),
+body > .top > input[type=file]:hover:active ~ .import.button {
+  background: var(--active_color);
+
+  filter: brightness(1.4);
+}
+
+body > .top > :is(.import, .delete_data, .draw, .export).button.cancel {
+  --hover_color: var(--red_hover);
+  --active_color: var(--red_active);
+}
+
+body > .top > :is(.import, .delete_data, .draw, .export).button:not(.cancel) > svg:not(.x_icon),
+body > .top > :is(.import, .delete_data, .draw, .export).button.cancel > .x_icon {
+  display: inline-block;
+}
+
+body > .top > :is(.import, .delete_data, .draw, .export).button.cancel > svg:not(.x_icon),
+body > .top > :is(.import, .delete_data, .draw, .export).button:not(.cancel) > .x_icon {
+  display: none;
+}
+
+body > .top > .import.button {
+  --hover_color: var(--blue_hover);
+  --active_color: var(--blue_active);
+
+  pointer-events: none;
+
+  left: 1.5vh;
+}
+
+body > .top > .import.button.cancel {
+  pointer-events: all;
+}
+
+body > .top > .delete_data.button {
+  --hover_color: var(--red_hover);
+  --active_color: var(--red_active);
+
+  left: calc(calc(var(--top_height) - 2px - 2vh) * 3/2 + 3vh);
+}
+
+body > .top > .delete_data.button > .confirm > svg {
+  top: 0;
+  height: calc(calc(var(--top_height) - 2px - 2vh) * 0.7);
+  width: calc(calc(var(--top_height) - 2px - 2vh) * 0.7 * 3/2);
+
+  border-radius: 0.5vmin;
+  padding: calc(calc(var(--top_height) - 2px - 2vh) * 0.2);
+
+  background: var(--red_background);
+
+  transition: height 500ms, opacity 500ms, transform 200ms, filter 250ms;
+}
+
+body > .top > .delete_data.button > .confirm:hover {
+  filter: brightness(1.2);
+}
+
+body > .top > .delete_data.button > .confirm:hover:active {
+  filter: brightness(1.4);
+}
+
+body > .top > .delete_data.button > .confirm.hide > svg {
+  pointer-events: none;
+
+  width: 0;
+  height: 0;
+
+  padding: 0;
+
+  opacity: 0;
+
+  transform: translateY(calc(calc(var(--top_height) - 2px - 2vh) * -1.1));
+
+  transition: height 500ms, width 500ms, opacity 500ms, transform 200ms, filter 250ms, padding 250ms;
+}
+
+body > .top > .files {
+  position: fixed;
+  left: calc(calc(calc(var(--top_height) - 2px - 2vh) * 3/2 + 2vh) * 2 + 0.5vh);
+  top: 1.5vh;
+  width: calc(100vw - var(--side_width) - 2vmin - calc(calc(var(--top_height) - 2px - 2vh) * 3/2 + 2vh) * 4 - 4px - 3vh);
+  height: calc(var(--top_height) - 2px - 2vh);
+
+  padding: 0 1.5vh;
+  border-right: 2px solid var(--shade_2-0);
+  border-left: 2px solid var(--shade_2-0);
+
+  line-height: calc(var(--top_height) - 2px - 2vh);
+}
+
+body > .top > .files > .file {
+  --hover_color: var(--blue_hover);
+  --active_color: var(--light_blue_active);
+
+  cursor: pointer;
+
+  display: inline-block;
+
+  height: calc(var(--top_height) - 2px - 4vh);
+
+  padding: 0.5vmin 1vmin;
+  margin: 0 0.5vmin;
+  border-radius: 1vmin;
+
+  line-height: calc(var(--top_height) - 2px - 4vh);
+  font-size: 0.85em;
+
+  background: var(--shade_2-0);
+
+  transition: all 250ms;
+}
+
+body > .top > .files > .file:hover {
+  background: var(--hover_color);
+}
+
+body > .top > .files > .file:active:hover {
+  background: var(--active_color);
+}
+
+body > .top > .files > .file.hide {
+  display: none;
+}
+
+body > .top > .files > .file:nth-child(2) {
+  margin-left: 0;
+}
+
+body > .top > .files > .file:last-child {
+  margin-right: 0;
+}
+
+body > .file_data_list > .file_data {
+  display: inline-block;
+
+  position: fixed;
+  max-height: 25vh;
+  left: 50%;
+  top: 50%;
+
+  padding: 1vmin;
+  border-radius: 1vmin;
+
+  line-height: 2em;
+  text-align: center;
+  color: var(--text_2);
+  overflow: hidden auto;
+
+  background: var(--shade_0-2);
+
+  transform: translate(-50%, -50%);
+
+  z-index: 3;
+}
+
+body > .file_data_list > .file_data > :is(.raw, .process) {
+  display: inline-block;
+
+  padding: 1vmin;
+  border-radius: 1vmin;
+
+  line-height: 1em;
+
+  background: var(--shade_1-1);
+}
+
+body > .file_data_list > .file_data > :is(.raw, .process).name {
+  margin-right: 0.5vmin;
+
+  border-top-right-radius: 0.5vmin;
+  border-bottom-right-radius: 0.5vmin;
+}
+
+body > .file_data_list > .file_data > :is(.raw, .process).extension {
+  border-top-left-radius: 0.5vmin;
+  border-bottom-left-radius: 0.5vmin;
+}
+
+body > .file_data_list > .file_data > .raw {
+  font-size: 1.2em;
+}
+
+body > .file_data_list > .file_data > .process {
+  margin-top: 0.5vmin;
+
+  font-size: 0.9em;
+  color: var(--subtitle_1);
+}
+
+body > .file_data_list > .file_data > .title {
+  margin: 0;
+  margin-top: 2vmin;
+}
+
+body > .file_data_list > .file_data > .metadata {
+  display: inline-block;
+  columns: 3;
+  column-gap: 1vmin;
+
+  max-width: 50vw;
+
+  padding: 1vmin;
+  border: 1px solid var(--shade_0-1);
+  border-radius: 1vmin;
+
+  font-size: 0.9em;
+
+  background: var(--shade_0-3);
+}
+
+body > .file_data_list > .file_data > .metadata > .datum {
+  display: inline-block;
+
+  width: calc(100% - 2vmin);
+
+  margin-top: 0.5vmin;
+  margin-right: 0.5vmin;
+  padding: 1vmin;
+  border-radius: 0.5vmin;
+
+  line-height: 1em;
+  white-space: nowrap;
+  overflow: auto;
+
+  background: var(--shade_1-1);
+}
+
+body > .file_data_list > .file_data a {
+  color: var(--link_1);
+
+  transition: all 100ms;
+}
+
+body > .file_data_list > .file_data a:hover {
+  color: var(--link_hover_1);
+}
+
+body > .file_data_list > .file_data a:active:hover {
+  color: var(--link_active_1);
+}
+
+body > .file_data_list > .file_data a:visited {
+  color: var(--visited_link_1);
+}
+
+body > .file_data_list > .file_data a:visited:hover {
+  color: var(--visited_link_hover_1);
+}
+
+body > .file_data_list > .file_data a:visited:active:hover {
+  color: var(--visited_link_active_1);
+}
+
+body > .top > .draw.button {
+  --hover_color: var(--orange_hover);
+  --active_color: var(--orange_active);
+
+  right: calc(calc(var(--top_height) - 2px - 2vh) * 3/2 + 3vh);
+}
+
+body > .top > .export.button {
+  --hover_color: var(--green_hover);
+  --active_color: var(--green_active);
+
+  right: 1.5vh;
+}
+
+body > .top > .export:is(.extensions, .name) {
+  position: absolute;
+  right: calc(1.5vh - 1vmin);
+  top: calc(var(--top_height) - 2px - 2vh + 3vh);
+  max-width: calc(100vw - var(--side_width) - 3vh - 2vmin);
+  height: calc(4vh + 1vmin);
+
+  padding: 1vmin;
+  border-radius: 1vmin;
+
+  line-height: 4vh;
+
+  white-space: nowrap;
+  overflow: auto hidden;
+
+  background: var(--shade_1-0);
+
+  transform-origin: top right;
+  transform: scale(1);
+
+  transition: all 500ms;
+}
+
+body > .top > .export.extensions > .extension {
+  --hover_color: var(--blue_hover);
+  --active_color: var(--blue_active);
+
+  display: inline-block;
+
+  min-width: calc(calc(var(--top_height) - 2px - 2vh) * 3/2 - 2vmin);
+
+  padding: 0.5vmin 1vmin;
+  margin: 0 0.25vw;
+  margin-bottom: 1vmin;
+  border-radius: 1vmin;
+
+  font-size: 0.85em;
+  text-align: center;
+
+  background: var(--shade_2-0);
+
+  transition: all 250ms;
+}
+
+body > .top > .export.extensions > .extension:first-child {
+  margin-left: 0;
+}
+
+body > .top > .export.extensions > .extension:last-child {
+  margin-right: 0;
+}
+
+body > .top > .export.extensions > .extension:hover {
+  background: var(--hover_color);
+
+  filter: brightness(1.2);
+}
+
+body > .top > .export.extensions > .extension:active:hover {
+  background: var(--active_color);
+
+  filter: brightness(1.4);
+}
+
+body > .top > .export:is(.extensions , .name).hide {
+  top: calc(var(--top_height) - 2px - 2vh);
+  right: calc(calc(calc(var(--top_height) - 2px - 2vh) * 3/2 - 2vmin) / 2);
+
+  opacity: 0;
+
+  transform: scale(0);
+}
+
+body > .top > .export.name {
+  height: calc(4vh + 1vmin + 1em);
+}
+
+body > .top > .export.name > input[type='text'][name='export_file_name'] {
+  width: min(max(calc(calc(100vw - var(--side_width)) / 3), 30ch), calc(100vw - var(--side_width) - 4vmin - 3vh));
+  height: 4vh;
+
+  padding: 0.5vmin 1vmin;
+  outline: 0;
+  border: 0;
+  border-radius: 1vmin;
+
+  color: var(--text_1);
+  font-size: 1em;
+
+  background: var(--shade_2-0);
+
+  transition: all 250ms;
+}
+
+body > .top > .export.name > .sub_text {
+  display: block;
+
+  margin: 0;
+  margin-top: 0.25em;
+  padding: 0;
+
+  color: var(--text_1);
+  text-align: center;
+  font-size: 0.75em;
+  line-height: normal;
+}
+
+body > .top > .export.name > .sub_text > small {
+  cursor: help;
+}
+
+body > .settings {
+  display: block;
+  aspect-ratio: 3/2;
+
+  position: fixed;
+  left: calc(calc(100vw - calc(min(95vw, 140vh) - 4vmin)) / 2);
+  top: calc(calc(145vh - calc(min(95vw, 140vh) - 1vmin)) / 2);
+  width: calc(min(95vw, 140vh) - 4vmin);
+
+  padding: 2vmin;
+
+  background: var(--shade_0-2);
+
+  overflow: auto;
+
+  z-index: 4;
+}
+
+body > .settings.hide {
+  pointer-events: none;
+
+  opacity: 0;
+}
+
+body > .settings > .title {
+  text-align: center;
+  font-size: 2.75em;
+
+  margin-top: 0;
+}
+
+body > .settings > .selection {
+  width: calc(100% - 4vmin);
+
+  padding: 2vmin;
+  border-radius: 2vmin;
+
+  text-align: center;
+
+  background: var(--shade_0-3);
+}
+
+body > .settings > .selection > .title {
+  margin: 0;
+  margin-bottom: 0.5em;
+
+  font-size: 1.5em;
+  line-height: 1em;
+}
+
+body > .settings > .selection > .range {
+  cursor: pointer;
+
+  position: relative;
+  height: 6vh;
+  width: 100%;
+
+  border-radius: 1vmin;
+
+  background: var(--shade_0-0)
+}
+
+body > .settings > .selection > .range > .shading {
+  position: relative;
+  height: 100%;
+
+  border-radius: 1vmin;
+
+  background: var(--dark_blue_background);
+}
+
+body > .settings > .selection > .range > :is(.min, .max) {
+  position: absolute;
+  top: 0;
+
+  font-size: 1em;
+  line-height: 6vh;
+
+  z-index: 2;
+}
+
+body > .settings > .selection > .range > .min {
+  left: 1ch;
+}
+
+body > .settings > .selection > .range > .max {
+  right: 1ch;
+}
+
+body > .settings > .selection > .inputs {
+  height: 6vh;
+}
+
+body > .settings > .selection > .inputs > input {
+  width: min(10ch, 20%);
+  height: 6vh;
+
+  padding: 0 1ch;
+  outline: 0;
+  border: 0;
+  border-radius: 1vmin;
+
+  font-size: 1.25em;
+  text-align: center;
+  color: var(--text_1);
+
+  background: var(--shade_0-1);
+}
+
+body > .settings > .selection > .inputs > input.min {
+  float: left;
+}
+
+body > .settings > .selection > .inputs > input.max {
+  float: right;
+}
+
+body > .settings > :is(.text_style, .padding, .background) {
+  width: calc(100% - 4vmin);
+
+  margin-top: 2vmin;
+  padding: 2vmin;
+  border-radius: 2vmin;
+
+  text-align: center;
+
+  background: var(--shade_0-3);
+}
+
+body > .settings > :is(.text_style, .padding, .background) > .title {
+  margin: 0;
+  margin-bottom: 0.5em;
+
+  font-size: 1.5em;
+  line-height: 1em;
+}
+
+body > .settings > .text_style > .content {
+  columns: 2;
+  column-gap: 1vmin;
+}
+
+body > .settings > .text_style > .content > .style,
+body > .settings > .padding > div {
+  display: inline-block;
+  width: calc(100% - 6vmin);
+
+  margin: 1vmin;
+  padding: 2vmin;
+  border-radius: 2vmin;
+
+  background: var(--shade_1-0);
+}
+
+body > .settings > .text_style > .content > .style > .title,
+body > .settings > .padding > div > .title {
+  margin: 0;
+  margin-bottom: 0.5em;
+
+  font-size: 1.5em;
+  line-height: 1em;
+}
+
+body > .settings > .text_style > .content > .style:is(.align, .character) > .content {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  align-content: center;
+}
+
+body > .settings > .text_style > .content > .style:is(.align, .character) > .content > .button {
+  --hover_color: var(--blue_hover);
+  --active_color: var(--blue_active);
+
+  aspect-ratio: 1/1;
+
+  position: relative;
+  width: calc(100% - 1em);
+  height: 6vh;
+
+  margin: 0.5em;
+  border-radius: 1vmin;
+
+  text-align: center;
+  line-height: 6vh;
+
+  background: var(--shade_0-2);
+
+  transition: all 250ms;
+}
+
+body > .settings > .text_style > .content > .style:is(.align, .character) > .content > .button:hover {
+  background: var(--dark_blue_hover);
+
+  filter: brightness(1.2);
+}
+
+body > .settings > .text_style > .content > .style:is(.align, .character) > .content > .button:active {
+  background: var(--dark_blue_hover);
+
+  filter: brightness(1.4);
+}
+
+body > .settings > .text_style > .content > .style:is(.align, .character) > .content > .button.selected {
+  background: var(--blue_background);
+}
+
+body > .settings > .text_style > .content > .style.font > .content,
+body > .settings > .padding > div > .content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-content: center;
+}
+
+body > .settings > .text_style > .content > .style.font > .content > .option,
+body > .settings > .padding > div > .content > .option {
+  width: calc(100% - 1.5em);
+
+  margin: 0.25em;
+  padding: 0.5em;
+  border-radius: 1vmin;
+
+  font-size: 1.25em;
+
+  background: var(--shade_0-3);
+}
+
+body > .settings > .text_style > .content > .style.font > .content > .option.family {
+  grid-column: 1 / span 2;
+}
+
+body > .settings > .text_style > .content > .style.font > .content > .option > label,
+body > .settings > .padding > div > .content > .option > label {
+  display: block;
+
+  margin-bottom: 1vmin;
+}
+
+body > .settings > .text_style > .content > .style.font > .content > .option > input,
+body > .settings > .padding > div > .content > .option > input,
+body > .settings > .background > input {
+  width: calc(100% - 1em);
+  height: 2em;
+
+  padding: 0 0.5em;
+  outline: 0;
+  border: 0;
+  border-radius: 1vmin;
+
+  font-size: 1em;
+  text-align: left;
+  color: var(--text_1);
+
+  background: var(--shade_0-1);
+}
+
+body > .settings > .text_style > .content > .style.font > .content > .option > input[type='color'] {
+  padding: 1vmin;
+}
+
+body > .settings > .text_style > .content > .style.preview {
+  height: 1.5em;
+
+  line-height: 1.5em;
+
+  transition: background 250ms;
+}
+
+body > .settings > .text_style > .content > .style.preview > span {
+  transition: color 250ms;
+}
+
+body > .settings > .padding {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+body > .settings > .padding > .title {
+  grid-column: 1 / span 2;
+}
+
+body > .settings > .background {
+  text-align: left;
+
+  margin-bottom: 2vmin;
+}
+
+body > .settings > .background > .title {
+  text-align: center;
+}
+
+body > .settings > .background > input {
+  width: calc(100% - 7vh - 1em);
+  height: 6vh;
+
+  font-size: 1.25em;
+}
+
+body > .settings > .background > .preview {
+  aspect-ratio: 1/1;
+  float: right;
+
+  height: calc(6vh - 4px);
+
+  border: 2px solid var(--shade_0-1);
+  border-radius: 1vmin;
+}
+
+body > .settings > :is(.cancel, .save).button {
+  aspect-ratio: 3/2;
+  display: block;
+
+  position: relative;
+  bottom: 0;
+  height: 6vmin;
+
+  border-radius: 2vmin;
+
+  text-align: center;
+
+  background: var(--shade_2-0);
+
+  transition: all 250ms;
+}
+
+body > .settings > :is(.cancel, .save).button:hover {
+  background: var(--hover-color);
+
+  filter: brightness(1.2);
+}
+
+body > .settings > :is(.cancel, .save).button:active {
+  background: var(--active-color);
+
+  filter: brightness(1.4);
+}
+
+body > .settings > .cancel.button {
+  --hover-color: var(--red_hover);
+  --active-color: var(--red_active);
+
+  float: right;
+
+  border-top-right-radius: 1vmin;
+  border-bottom-right-radius: 1vmin;
+}
+
+body > .settings > .save.button {
+  --hover-color: var(--orange_hover);
+  --active-color: var(--orange_active);
+
+  float: right;
+  margin-left: 1vmin;
+
+  border-top-left-radius: 1vmin;
+  border-bottom-left-radius: 1vmin;
+}
+
+body > .settings > :is(.cancel, .save).button > svg {
+  aspect-ratio: 1/1;
+
+  position: relative;
+  top: 12.5%;
+  height: 75%;
+}
+
+body > .side {
+  position: fixed;
+  right: 0;
+  top: 0;
+  width: var(--side_width);
+  height: 100vh;
+
+  padding: 0.5vmin;
+  border-left: 2px solid var(--shade_0-3); /* try 2px solid var(--shade_2-0) */
+
+  background: var(--shade_0-0);
+
+  z-index: 2;
+}
+
+body > .side > .top {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: calc(var(--top_height) - 2px);
+
+  padding: 0.5vmin;
+  border-bottom: 2px solid var(--shade_0-3); /* try 2px solid var(--shade_2-0) */
+
+  line-height: calc(var(--top_height) - 2px);
+
+  background: var(--shade_0-0);
+
+  z-index: 2;
+}
+
+body > .side > .top > .hide_border {
+  position: absolute;
+  left: -2px;
+  top: 0;
+  width: 2px;
+  height: calc(var(--top_height) - 2px + 1vmin);
+
+  background: var(--shade_0-0);
+
+  z-index: 1;
+}
+
+body > .side > .top > .text {
+  text-align: center;
+}
+
+body > .side > .top > .text > h1 {
+  margin: 0;
+}
+
+body > .side > .content {
+  position: absolute;
+  left: 0;
+  top: calc(var(--top_height) + 1vmin);
+  width: calc(100% - 1vmin);
+  height: calc(100vh - var(--top_height) - 2vmin);
+
+  padding: 0.5vmin;
+
+  background: inherit;
+
+  z-index: 2;
+}
+
+body > .side > .content > :is(.add, .auto, .clean, .remove_all).button {
+  aspect-ratio: 1/1;
+
+  position: absolute;
+  width: calc(var(--side_width) / 10);
+  bottom: 2vmin;
+
+  border-radius: 30%;
+
+  text-align: center;
+
+  background: var(--shade_2-0);
+
+  z-index: 3;
+
+  transition: all 250ms;
+}
+
+body > .side > .content > :is(.add, .auto, .clean, .remove_all).button:hover {
+  background: var(--hover_color);
+
+  filter: brightness(1.2);
+}
+
+body > .side > .content > :is(.add, .auto, .clean, .remove_all).button:hover:active {
+  background: var(--active_color);
+
+  filter: brightness(1.4);
+}
+
+body > .side > .content > :is(.add, .auto, .clean, .remove_all).button > svg {
+  aspect-ratio: 1/1;
+
+  position: relative;
+  top: 12.5%;
+  height: 75%;
+}
+
+body > .side > .content > .add.button {
+  --hover_color: var(--green_hover);
+  --active_color: var(--green_active);
+
+  left: 2vmin;
+}
+
+body > .side > .content:has(.auto.button:not(.disabled)) > .add.button {
+  border-top-right-radius: 10%;
+  border-bottom-right-radius: 10%;
+}
+
+body > .side > .content > .auto.button {
+  --hover_color: var(--blue_hover);
+  --active_color: var(--blue_active);
+
+  left: calc(2vmin + calc(var(--side_width) / 10) + 0.5vmin);
+
+  border-top-left-radius: 10%;
+  border-bottom-left-radius: 10%;
+}
+
+body > .side > .content > .auto.button.disabled {
+  pointer-events: none;
+
+  opacity: 0;
+}
+
+body > .side > .content > .clean.button {
+  --hover_color: var(--orange_hover);
+  --active_color: var(--orange_active);
+
+  right: calc(2vmin + calc(var(--side_width) / 10) + 0.5vmin);
+
+  border-top-right-radius: 10%;
+  border-bottom-right-radius: 10%;
+}
+
+body > .side > .content > .clean.button.disabled {
+  pointer-events: none;
+
+  opacity: 0;
+}
+
+body > .side > .content > .remove_all.button {
+  --hover_color: var(--red_hover);
+  --active_color: var(--red_active);
+
+  right: 2vmin;
+}
+
+body > .side > .content:has(.clean.button:not(.disabled)) > .remove_all.button {
+  border-top-left-radius: 10%;
+  border-bottom-left-radius: 10%;
+}
+
+body > .side > .content > .remove_all.button.disabled {
+  pointer-events: none;
+
+  opacity: 0;
+}
+
+body > .side > .content > .groups {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: calc(100% - 4vmin - var(--side_width) / 10 - 2px);
+
+  border-bottom: 2px solid var(--shade_0-3); /* try 2px solid var(--shade_2-0) */
+
+  overflow: hidden auto;
+
+  background: var(--shade_0-1_2);
+
+  z-index: 2;
+}
+
+body > .side > .content > .groups > .group {
+  position: relative;
+  width: calc(var(--side_width) - 2vmin);
+  min-height: calc(6vmin + calc(var(--side_width) - 2vmin) / 10 + 1.5em + 2vmin);
+
+  margin: 1vmin;
+  border-radius: 2vmin;
+
+  background: var(--shade_0-3);
+
+  z-index: 2;
+}
+
+body > .side > .content > .groups > .group > .content {
+  padding: 1vmin;
+}
+
+body > .side > .content > .groups > .group > .content > .name {
+  outline: 0;
+
+  text-align: center;
+  font-size: 1.5em;
+
+  white-space: nowrap;
+}
+
+body > .side > .content > .groups > .group > .content > .name:focus {
+  overflow: auto hidden;
+}
+
+body > .side > .content > .groups > .group > .content > .name:focus {
+  right: 0 !important;
+}
+
+body > .side > .content > .groups > .group > .content > :is(.edit, .format, .remove).button {
+  aspect-ratio: 1/1;
+
+  position: absolute;
+  width: 10%;
+  bottom: 2vmin;
+
+  border-radius: 20%;
+
+  text-align: center;
+
+  background: var(--shade_2-0);
+
+  transition: all 250ms;
+}
+
+body > .side > .content > .groups > .group > .content > :is(.edit, .format, .remove).button:hover {
+  background: var(--hover_color);
+
+  filter: brightness(1.2);
+}
+
+body > .side > .content > .groups > .group > .content > :is(.edit, .format, .remove).button:hover:active {
+  background: var(--active_color);
+
+  filter: brightness(1.4);
+}
+
+body > .side > .content > .groups > .group > .content > :is(.edit, .format, .remove).button > svg {
+  aspect-ratio: 1/1;
+
+  position: relative;
+  top: 12.5%;
+  height: 75%;
+}
+
+body > .side > .content > .groups > .group > .content > .edit.button {
+  --hover_color: var(--blue_hover);
+  --active_color: var(--blue_active);
+
+  left: 2vmin;
+
+  border-top-right-radius: 10%;
+  border-bottom-right-radius: 10%;
+}
+
+body > .side > .content > .groups > .group > .content > .format.button {
+  --hover_color: var(--yellow_hover);
+  --active_color: var(--yellow_active);
+
+  left: calc(2.5vmin + 10%);
+
+  border-top-left-radius: 10%;
+  border-bottom-left-radius: 10%;
+}
+
+body > .side > .content > .groups > .group > .content > .remove.button {
+  --hover_color: var(--red_hover);
+  --active_color: var(--red_active);
+
+  right: 2vmin;
+}
+
+body > .side > .content > .groups > .group > .content > .data {
+  position: relative;
+  left: 1vmin;
+  width: calc(var(--side_width) - 4vmin);
+
+  margin-bottom: 0.5vmin;
+}
+
+body > .side > .content > .groups > .group > .content > .data:before,
+body > .side > .content > .groups > .group > .content > .data:after {
+  content: '';
+
+  pointer-events: none;
+
+  position: absolute;
+  top: 0;
+  width: 8ch;
+  height: 90%;
+
+  border-radius: 1vmin;
+
+  z-index: 1;
+}
+
+body > .side > .content > .groups > .group > .content > .data:before {
+  left: 0;
+
+  background-image: linear-gradient(to left, transparent, var(--shade_1-2) 90%);
+}
+
+body > .side > .content > .groups > .group > .content > .data:after {
+  right: calc(10vmin + 2em);
+
+  background-image: linear-gradient(to right, transparent, var(--shade_1-2) 90%);
+}
+
+body > .side > .content > .groups > .group > .content > .data:last-child {
+  margin-bottom: calc(calc(var(--side_width) - 2vmin) / 10 + 3vmin);
+}
+
+body > .side > .content > .groups > .group > .content > .data > .content {
+  display: inline-block;
+
+  width: calc(100% - 10vmin - 2em);
+  height: 1em;
+
+  padding: 1.5vmin 0;
+  border-radius: 1vmin;
+
+  line-height: 1em;
+  white-space: nowrap;
+  overflow: auto hidden;
+
+  background: var(--shade_1-2);
+
+  filter: brightness(1);
+
+  transition: all 250ms;
+}
+
+body > .side > .content > .groups > .group > .content > .data > .content:hover {
+  filter: brightness(1.2);
+}
+
+body > .side > .content > .groups > .group > .content > .data > .content:hover:active {
+  filter: brightness(1.4);
+}
+
+body > .side > .content > .groups > .group > .content > .data > .content > .tab {
+  display: inline-block;
+
+  width: 2ch;
+  height: 1px;
+}
+
+body > .side > .content > .groups > .group > .content > .data > .content > :is(.strand, .type, .file) {
+  --length: 1;
+
+  display: inline-block;
+
+  position: relative;
+  top: -0.75vmin;
+  height: 1em;
+  min-width: calc(1ch * var(--length, 1));
+
+  padding: 0.75vmin 1vmin;
+  margin: 0 0.25vmin;
+  border-radius: 1vmin;
+
+  line-height: 1em;
+  font-size: 1em;
+  text-align: center;
+
+  background: linear-gradient(45deg, var(--shade_2-0), var(--shade_3-0));
+}
+
+body > .side > .content > .groups > .group > .content > .data > :is(.copy, .paste).button {
+  aspect-ratio: 1/1;
+  display: block;
+
+  float: right;
+  height: calc(1em + 3vmin);
+
+  margin-right: 2vmin;
+  border-radius: 1vmin;
+
+  text-align: center;
+
+  background: var(--shade_2-0);
+
+  transition: all 250ms;
+}
+
+body > .side > .content > .groups > .group > .content > .data > :is(.copy, .paste).button:hover {
+  background: var(--hover_color);
+
+  filter: brightness(1.2);
+}
+
+body > .side > .content > .groups > .group > .content > .data > :is(.copy, .paste).button:hover:active {
+  background: var(--active_color);
+
+  filter: brightness(1.4);
+}
+
+body > .side > .content > .groups > .group > .content > .data > :is(.copy, .paste).button > svg {
+  aspect-ratio: 1/1;
+
+  position: relative;
+  top: 12.5%;
+  height: 75%;
+}
+
+body > .side > .content > .groups > .group > .content > .data > .copy.button {
+  --hover_color: var(--blue_hover);
+  --active_color: var(--blue_active);
+
+  margin-right: 1vmin;
+}
+
+body > .side > .content > .groups > .group > .content > .data > .paste.button {
+  --hover_color: var(--yellow_hover);
+  --active_color: var(--yellow_active);
+}
+
+body > .side > .content > .groups > .group > .content > .data > .paste.button.disabled {
+  pointer-events: none;
+
+  background: transparent;
+
+  filter: brightness(0.1);
+}
+
+body > .previews {
+  position: fixed;
+  z-index: 3;
+}
+
+body > .previews > .preview {
+  position: fixed;
+  height: 0;
+
+  border: 2px solid #222;
+  border-radius: calc(var(--sidePanelWidth) / 2);
+
+  opacity: 0;
+  background: var(--color_bg, #000);
+
+  transform: scale(0);
+  transform-origin: center right;
+
+  transition: opacity 250ms, transform 500ms;
+}
+
+body > .data_select {
+  position: fixed;
+  left: 5vw;
+  top: 5vh;
+  width: 90vw;
+  height: 90vh;
+
+  border: 2px solid var(--shade_1-0); /* try 2px solid var(--shade_2-0) */
+  border-radius: 1vw;
+
+  background: var(--shade_0-2);
+
+  overflow: hidden auto;
+
+  z-index: 4;
+
+  transition: all 250ms;
+}
+
+body > .data_select.hide {
+  pointer-events: none;
+
+  opacity: 0;
+}
+
+body > .data_select > .content {
+  column-count: 2;
+  column-gap: 1vmin;
+
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: calc(100% - 2vmin);
+
+  padding: 1vmin;
+}
+
+@media (max-width: 1000px) {
+  body > .data_select > .content {
+    column-count: 1;
+  }
+}
+
+body > .data_select > .content > .file.section {
+  display: inline-block;
+  column-count: 2;
+
+  padding: 1vmin;
+  margin-top: 1vmin;
+  width: calc(100% - 2vmin);
+  border-radius: 1vw;
+
+  background: var(--shade_1-0);
+}
+
+body > .data_select > .content > .file.section > p.label {
+  column-span: all;
+
+  margin: 0.5vmin 0;
+
+  text-align: center;
+}
+
+body > .data_select > .content > .file.section > .type.section {
+  display: inline-block;
+
+  width: calc(100% - 2vmin);
+
+  margin-top: 1vmin;
+  padding: 1vmin;
+  border-radius: 0.5vmin;
+
+  text-align: center;
+
+  overflow: auto;
+
+  background: var(--shade_1-2);
+}
+
+body > .data_select > .content > .file.section > .type.section:last-of-type:nth-of-type(2) {
+  display: block;
+  column-span: all;
+}
+
+body > .data_select > .content > .file.section > .type.section > p.label {
+  position: relative;
+  width: calc(100% - 0.5em);
+
+  padding: 0 0.25em;
+  margin: 0.5vmin 0;
+
+  text-align: center;
+
+  overflow: hidden;
+}
+
+body > .data_select > .content > .file.section > .type.section > p.label:before,
+body > .data_select > .content > .file.section > .type.section > p.label:after {
+  content: '';
+
+  pointer-events: none;
+
+  display: inline-block;
+
+  position: absolute;
+  top: 0;
+  width: 8ch;
+  height: 1.5em;
+
+  z-index: 1;
+}
+
+body > .data_select > .content > .file.section > .type.section > p.label:before {
+  left: 0;
+
+  background-image: linear-gradient(to left, transparent, var(--shade_1-2) 90%);
+}
+
+body > .data_select > .content > .file.section > .type.section > p.label:after {
+  right: 0;
+
+  background-image: linear-gradient(to right, transparent, var(--shade_1-2) 90%);
+}
+
+body > .data_select > .content > .file.section > .type.section > p.label > span {
+  display: block;
+
+  width: calc(100% - 2em);
+
+  padding: 0 1em;
+
+  overflow: auto hidden;
+}
+
+body > .data_select > .content > .file.section > .type.section > .strand.button {
+  display: inline-block;
+  min-width: calc(1.5em + 0.5vmin);
+
+  margin-top: 0.5vmin;
+  margin-right: 0.5vmin;
+  padding: 1vmin;
+  border: 2px solid var(--shade_2-2);
+  border-radius: 0.5vmin;
+
+  text-align: center;
+  font-size: 0.75em;
+
+  background: var(--shade_2-2);
+
+  transition: background 250ms, filter 250ms, border-color 250ms;
+}
+
+body > .data_select > .content > .file.section > .type.section > .strand.button:hover {
+  filter: brightness(1.2);
+}
+
+body > .data_select > .content > .file.section > .type.section > .strand.button:hover:active {
+  filter: brightness(1.4);
+}
+
+body > .data_select > .content > .file.section > .type.section > .strand.button:first-child {
+  margin-top: 1vw;
+}
+
+body > .data_select > .content > .file.section > .type.section > .strand.button.selected {
+  border: 2px solid var(--blue_border);
+
+  background: var(--blue_background);
+}
+
+body > iframe.line_settings {
+  aspect-ratio: 3/2;
+
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: min(95vw, 140vh);
+
+  outline: 0;
+  border: 2px solid var(--shade_1-0); /* try 2px solid var(--shade_2-0) */
+  border-radius: 1vw;
+
+  background: var(--shade_0-2);
+
+  overflow: hidden auto;
+
+  z-index: 4;
+
+  transform: translate(calc(50vw - 50%), calc(50vh - 50%));
+
+  transition: opacity 250ms;
+}
+
+body > iframe.line_settings.hide {
+  pointer-events: none;
+
+  outline: 0;
+
+  opacity: 0;
+}
+
+body > .content {
+  position: fixed;
+  left: 0;
+  top: calc(var(--top_height) + 1vmin);
+  width: calc(100vw - var(--side_width) - 1vmin);
+  height: calc(100vh - var(--top_height) - 1vmin);
+
+  background: url('../../../assets/images/logo.png') no-repeat center center / contain;
+}
+
+body > .content > .easel > .paper {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+}

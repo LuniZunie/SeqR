@@ -579,10 +579,14 @@ async function FileReader(e) {
       for (const file of files) {
         const extension = parseExtension(file.name.splitOnLast('.')[1]);
         if (!extension) {
+        if (!extension) {
           body.qsa('.bad_extension_warning').memRmv();
 
           const $warning = body.appendChild('notification');
           $warning.addClass('bad_extension_warning');
+          $warning.innerHTML = `File <code>${file.name}</code> is not a supported extension!<br><br>Supported Extensions: ${extensions.k_map(k =>
+            `<code>.${k}</code>`
+          ).join(', ')}`;
           $warning.innerHTML = `File <code>${file.name}</code> is not a supported extension!<br><br>Supported Extensions: ${extensions.k_map(k =>
             `<code>.${k}</code>`
           ).join(', ')}`;
@@ -695,6 +699,7 @@ async function FileReader(e) {
             $file.setAttr('metadata', JSON.stringify(metaData));
             $file.rmvClass('hide');
           })(body.qs(`body > .top > .files > .file:not(.template)[process-name='${name}']`))
+          })(body.qs(`body > .top > .files > .file:not(.template)[process-name='${name}']`))
         );
         break;
       } case 'cancel':
@@ -702,6 +707,7 @@ async function FileReader(e) {
         rejected = true;
         fileSaveNames.forEach(({ name }) => {
           delete global.data[name];
+          body.qs(`body > .top > .files > .file:not(.template)[process-name='${name}']`)?.memRmv();
           body.qs(`body > .top > .files > .file:not(.template)[process-name='${name}']`)?.memRmv();
         });
         break;

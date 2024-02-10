@@ -315,7 +315,7 @@ global.prandom.generator = PrandomGenerator(global.prandom.seed);
 async function LoadInsertedDocuments() {
   const loadedDocs = {};
   async function loadDoc(src) {
-    return loadedDocs[src] ?? await fetch(src).then(r => r.text()).then(t => loadedDocs[src] = t);
+    return loadedDocs[src] ?? await fetch(src).then(r => r.text()).then(t => loadedDocs[src] = t.replace(/<!--[\s\S]*?-->/g, ''));
   }
 
   console.time('LoadInsertedDocuments');

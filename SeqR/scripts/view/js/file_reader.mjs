@@ -26,7 +26,11 @@ Object.entries(mainExports).forEach(
 
 export {
   writeFLS,
+  writeFLS_short,
   readFLS,
+  readFLS_short,
+  readFLSsByKey,
+  readFLSsByKey_short,
   FileReader,
   testFileReader,
 };
@@ -47,32 +51,140 @@ const extensions = {
 };
 body.qs('body > .top > input[type="file"]')?.setAttr('accept', extensions.k_map(k => `.${k}`).join(','));
 
-// fls = formatted line string
+// FLS = formatted line string
+const FLS_ks = {
+  line: {
+    column: 0,
+    shorthand: 'l',
+    read: v => +v,
+    write: v => v,
+  },
+  starts: {
+    column: 1,
+    shorthand: 's',
+    read: v => v.split(',').map(v => +v),
+    write: v => v.join(','),
+  },
+  start: {
+    column: 1,
+    shorthand: 'S',
+    read: v => v.split(',').min(),
+  },
+  ends: {
+    column: 2,
+    shorthand: 'e',
+    read: v => v.split(',').map(v => +v),
+    write: v => v.join(','),
+  },
+  end: {
+    column: 2,
+    shorthand: 'E',
+    read: v => v.split(',').max(),
+  },
+  group: {
+    column: 3,
+    def: '',
+    shorthand: 'g',
+    write: v => v,
+  },
+  parents: {
+    column: 4,
+    def: '',
+    shorthand: 'p',
+    read: v => v.split(','),
+    write: v => v.join(','),
+  },
+  color: {
+    column: 5,
+    def: '',
+    shorthand: 'c',
+    write: v => v,
+  },
+  zIndex: {
+    column: 6,
+    def: '',
+    shorthand: 'z',
+    read: v => v.split(',').map(v => +v),
+    write: v => v == '0' ?
+      '' :
+      (v instanceof Array ? v : [ v ]).join(','),
+  },
+}._$sort(([ , v_a ], [ , v_b ]) =>
+  v_a.column - v_b.column
+)._$map(([ k, v ]) =>
+  [ k, v._$map(([ k, v ]) =>
+    [ k, v instanceof Function || k == 'shorthand' ? v : JSON.stringify(v) ]
+  ) ]
+);
 
-function writeFLS({ l: line, s: starts, e: ends, g: group = '', p: parents = '', c: color = '', z: zIndex = '' }) {
-  return `${line} ${starts.min()} ${ends.max()} ${starts.join(',')} ${ends.join(',')} ${group} ${parents.join(',')} ${color} ${zIndex}`;
-}
+const FLS_ks_unique = {};
+FLS_ks._reduce((taken, [ k, v ]) => {
+  const column = v.column;
+  if (taken.includes(column))
+    return taken;
 
-function readFLS(str) {
-  return Object.fromEntries(str.split(' ').map((v, i) => {
-    const obj = [
-      [ 'line', (v => +v) ],
-      [ 'start', (v => +v) ],
-      [ 'end', (v => +v) ],
-      [ 'starts', (str => str.split(',').map(v => +v)) ],
-      [ 'ends', (str => str.split(',').map(v => +v)) ],
-      'group',
-      [ 'parents', (str => str.split(',')) ],
-      'color',
-      'zIndex',
-    ][i];
+  FLS_ks_unique[k] = v;
+  return taken.concat(column);
+}, []);
 
-    if (typeof obj == 'string')
-      return [ obj, v ];
-    else
-      return [ obj[0], obj[1](v) ];
-  }));
-}
+const writeFLS = new Function(
+  `{${FLS_ks_unique._map(( [ k, { def } ]) =>
+    def === undefined ? k : `${k} = ${def}`
+  ).join(',')}}`,
+  `return \`${FLS_ks.v_map(({ write, column }) =>
+    write && `\${(
+      ${write.toString()}
+    )(
+      ${FLS_ks_unique.k_find(k => FLS_ks_unique[k].column == column)}
+    )}`
+  ).filter(v => v !== undefined).join(' ')}\`;`
+);
+
+const writeFLS_short = new Function(
+  `{${FLS_ks_unique.v_map(({ def, shorthand }) =>
+    def === undefined ? shorthand : `${shorthand} = ${def}`
+  ).join(',')}}`,
+  `return \`${FLS_ks.v_map(({ write, column }) =>
+    write && `\${(
+      ${write.toString()}
+    )(
+      ${FLS_ks_unique[FLS_ks_unique.k_find(k => FLS_ks_unique[k].column == column)].shorthand}
+    )}`
+  ).filter(v => v !== undefined).join(' ')}\`;`
+);
+
+const readFLS = new Function('str', `
+  str = str.split(' ');
+  return { ${FLS_ks._map(([ k, { column, read } ]) =>
+    `${k}: ${read ? `(${read.toString()})(str[${column}])` : `str[${column}]`}`
+  )} };
+`);
+
+const readFLS_short = new Function('str', `
+  str = str.split(' ');
+  return { ${FLS_ks.v_map(({ column, read, shorthand }) =>
+    `${shorthand}: ${read ? `(${read.toString()})(str[${column}])` : `str[${column}]`}`
+  )} };
+`);
+
+const { readFLSsByKey, readFLSsByKey_short } = (function(func) {
+  return {
+    readFLSsByKey: func.bind(readFLS),
+    readFLSsByKey_short: func.bind(readFLS_short),
+  }
+})(function(str, ...kvs) {
+  return str.split('\n').reduce(({ accepted, rejected }, line) => {
+    const obj = this(line);
+    (kvs.some(kvs_2 =>
+      kvs_2._every(([ k, v ]) => {
+        const obj_v = (v => v instanceof Array ? v.join(',') : v)(obj[k]);
+        return (v instanceof Array ? v : [ v ]).some(v => v == obj_v);
+      })
+    ) ? accepted : rejected).push(obj);
+
+    return { accepted, rejected };
+  }, { accepted: [], rejected: [] });
+});
 
 function testFileReader(str, extension = 'gff') {
   const file = new Blob([ str ], { type: 'text/plain' });
@@ -112,23 +224,17 @@ async function FileReader(e) {
 
   const metadataParser = [];
   const handlers = {
-    /**
-     * Handler for .gff/.gff2 files.
-     * @param {String} line - The line to process.
-     */
     gff: function(line, emptyCache, misc) {
       if (rejected)
         return;
 
       ++lineNum;
       if (line[0] == '#') { // comment defintions should only be at the start of the line
-        if (line[1] == '#' && line[2] != '#' && line.trim() != '##') { // meta-data
-          const metadataParser_id = metadataParser.length;
-          metadataParser.push(false);
-          new Promise(async r => {
+        if (line[1] == '#' && line[2] != '#' && line.trim() != '##') // meta-data
+          metadataParser(new Promise(async r => {
             line = line.slice(2).split(/\s/);
             const segments = [];
-            for (const segment of line) {
+            for (const segment of line)
               await new Promise(async r => {
                 try {
                   const url = new URL(segment).href; // make sure it's a valid url
@@ -148,7 +254,6 @@ async function FileReader(e) {
                   r(segment);
                 }
               }).then(v => segments.push(v));
-            }
 
             fileSaveNames.last().metaData.push(segments.reduce((arr, v) =>
               v instanceof Object ?
@@ -162,8 +267,7 @@ async function FileReader(e) {
             ).filter(v => v != ''));
 
             r('done');
-          }).then(v => metadataParser[metadataParser_id] = true);
-        }
+          }));
 
         return;
       } else if (line.startsWith('browser') || line.startsWith('track'))
@@ -203,11 +307,11 @@ async function FileReader(e) {
 
       if (cacheTotal >= global.settings.readerCacheMax || emptyCache)
         chunkCaches = chunkCaches._$filter(([ type, strand ]) =>
-          void(strand._forEach(([ strand, groups ]) =>
+          void strand._forEach(([ strand, groups ]) =>
             groups._$map(([ group, v ]) => [
               group,
               v.reduce((sum, { v, l: length }) => [
-                `${sum[0]}\n${writeFLS(v)}`,
+                `${sum[0]}\n${writeFLS_short(v)}`,
                 [ min(sum[1][0], v.s), max(sum[1][1], v.e) ],
                 sum[2] + length
               ], [ '', [ Infinity, -Infinity ], 0 ])
@@ -235,7 +339,7 @@ async function FileReader(e) {
                   delete chunkCaches[type];
               }
             }
-          ))) || !emptyCache
+          )) || !emptyCache
         )
     },
     gff3: function(line, emptyCache, misc) {
@@ -246,13 +350,11 @@ async function FileReader(e) {
 
       ++lineNum;
       if (line[0] == '#') { // comment defintions should only be at the start of the line
-        if (line[1] == '#' && line[2] != '#' && line.trim() != '##') { // meta-data
-          const metadataParser_id = metadataParser.length;
-          metadataParser.push(false);
-          new Promise(async r => {
+        if (line[1] == '#' && line[2] != '#' && line.trim() != '##') // meta-data
+          metadataParser.push(new Promise(async r => {
             line = line.slice(2).split(/\s/);
             const segments = [];
-            for (const segment of line) {
+            for (const segment of line)
               await new Promise(async r => {
                 try {
                   const url = new URL(segment).href; // make sure it's a valid url
@@ -271,7 +373,6 @@ async function FileReader(e) {
                   r(segment);
                 }
               }).then(v => segments.push(v));
-            }
 
             fileSaveNames.last().metaData.push(segments.reduce((arr, v) =>
               v instanceof Object ?
@@ -285,8 +386,7 @@ async function FileReader(e) {
             ).filter(v => v != ''));
 
             r('done');
-          }).then(v => metadataParser[metadataParser_id] = true);
-        }
+          }));
 
         return;
       } else if (line.startsWith('browser') || line.startsWith('track'))
@@ -296,12 +396,14 @@ async function FileReader(e) {
       if (attrs.length > 1 || !phase)
         return;
 
-      attrs = (v => v == '.' ? {} : Object.fromEntries(v?.split(';')?.map(v => v.split('=')) ?? []))(attrs[0]);
+      attrs = (v => v == '.' ? {} : Object.fromEntries(v?.split(';')?.map(v =>
+        v.split('=')
+      ) ?? []))(attrs[0]);
       const group = attrs.ID ?? '';
-      const parents = attrs.Parent;
+      const parents = attrs.Parent?.split(',');
 
-      if (group != '' && parents != '')
-        parents?.split(',').forEach(parent => {
+      if (group != '' && parents)
+        parents.forEach(parent => {
           if (parent == '') {
             reader.ref[group] ??= { o: {} };
             reader.dir[group] = reader.ref[group];
@@ -338,11 +440,14 @@ async function FileReader(e) {
 
       if (cacheTotal >= global.settings.readerCacheMax || emptyCache) {
         chunkCaches = chunkCaches._$filter(([ type, caches ]) =>
-          void(caches._$map(([ k, v ]) => [
+          void caches._$map(([ k, v ]) => [
             k,
             v.reduce((sum, { v, l: length }) => [
-              `${sum[0]}\n${writeFLS(v)}`,
-              [ min(sum[1][0], v.s), max(sum[1][1], v.e) ],
+              `${sum[0]}\n${writeFLS_short(v)}`,
+              [
+                min(sum[1][0], v.s),
+                max(sum[1][1], v.e)
+              ],
               sum[2] + length
             ], [ '', [ Infinity, -Infinity ], 0 ])
           ])._sort(([ , v_a ], [ , v_b ]) =>
@@ -364,7 +469,7 @@ async function FileReader(e) {
             delete chunkCaches[type][k];
             if (chunkCaches[type]._len() == 0)
               delete chunkCaches[type];
-          })) || !emptyCache
+          }) || !emptyCache
         );
       }
     },
@@ -392,9 +497,11 @@ async function FileReader(e) {
 
       cacheTotal += length;
 
-      const [ b_s, b_e ] = blockCount ? (function(starts, sizes) {
-        return [ starts, sizes.map((v, i) => v + starts[i]) ];
-      })(blockStarts.split(',').map(v => +v), blockSizes.split(',').map(v => +v)) : [ undefined, undefined ];
+      const [ b_s, b_e ] = blockCount ?
+        ((starts, sizes) =>
+          [ starts, sizes.map((v, i) => v + starts[i]) ]
+        )(blockStarts.split(',').map(v => +v), blockSizes.split(',').map(v => +v)) :
+        [ undefined, undefined ];
 
       chunkCaches[chrom] ??= {};
       chunkCaches[chrom][strand] ??= [];
@@ -408,11 +515,14 @@ async function FileReader(e) {
 
       if (cacheTotal >= global.settings.readerCacheMax || emptyCache)
         chunkCaches = chunkCaches._$filter(([ chrom, caches ]) =>
-          void(caches._$map(([ k, v ]) => [
+          void caches._$map(([ k, v ]) => [
             k,
             v.reduce((sum, { v, l: length }) => [
-              `${sum[0]}\n${writeFLS(v)}`,
-              [ min(sum[1][0], v.s), max(sum[1][1], v.e) ],
+              `${sum[0]}\n${writeFLS_short(v)}`,
+              [
+                min(sum[1][0], v.s),
+                max(sum[1][1], v.e)
+              ],
               sum[2] + length
             ], [ '', [ Infinity, -Infinity ], 0 ])
           ])._sort(([ , v_a ], [ , v_b ]) =>
@@ -434,7 +544,7 @@ async function FileReader(e) {
             delete chunkCaches[chrom][k];
             if (chunkCaches[chrom]._len() == 0)
               delete chunkCaches[chrom];
-          })) || !emptyCache
+          }) || !emptyCache
         );
     }
   };
@@ -442,15 +552,15 @@ async function FileReader(e) {
   const postHandlers = {
     gff: async function(chunks) {
       const chunksTemp = {};
-      for (const [ type, strands ] of Object.entries(chunks)) {
+      for (const [ type, strands ] of chunks._ens()) {
         chunksTemp[type] = {};
-        for (const [ strand, groups ] of Object.entries(strands)) {
+        for (const [ strand, groups ] of strands._ens()) {
           chunksTemp[type][strand] = [];
 
           let lines = [];
           let range = [ Infinity, -Infinity ];
           let cacheLength = 0;
-          for (const [ group, vs ] of Object.entries(groups)) {
+          for (const [ group, vs ] of groups._ens()) {
             let minLine = Infinity;
             let poses = [ [], [] ];
             for (const v of vs) {
@@ -476,9 +586,7 @@ async function FileReader(e) {
                   minLine = obj.minLine;
                   poses = obj.poses;
                 },
-                abort(err) {
-                  console.error(err);
-                },
+                abort(err) { console.error(err); },
               });
 
               const blob = await fetch(url, { cache: 'no-store' }).then(r => r.blob());
@@ -490,7 +598,7 @@ async function FileReader(e) {
             }
             poses.sort((a, b) => a[0] - b[0]);
 
-            const fullLine = writeFLS(minLine, poses[0], poses[1], group);
+            const fullLine = writeFLS_short(minLine, poses[0], poses[1], group);
             lines.push(fullLine);
             cacheLength += fullLine.length;
 
@@ -506,12 +614,11 @@ async function FileReader(e) {
             }
           }
 
-          if (lines.length) {
+          if (lines.length)
             chunksTemp[type][strand].push({
               u: URL.createObjectURL(new Blob([ lines.join('\n') ])).replace('blob:',' ').trim(),
               r: range
             });
-          }
         }
       }
 
@@ -525,6 +632,7 @@ async function FileReader(e) {
         flat[k].push({ p: constructed[1].p, z: constructed[1].z });
         return constructed;
       };
+
       const construct = (k, v, p, z) => {
         if (p)
           v.p = p;
@@ -538,11 +646,11 @@ async function FileReader(e) {
 
         return [ k, { z, p } ];
       };
-      reader.dir = reader.dir._$map(([ k, v ]) => construction(k, v, undefined, 0));
+      reader.dir = reader.dir._$map(([ k, v ]) => construction(k, v, undefined, 1));
 
       reader.ref = reader.ref._$map(([ k, v ]) => {
         if (v.z === undefined) {
-          v.z = -1;
+          v.z = 0;
           v.o = v.o._$map(([ this_k, this_v ]) => construction(this_k, this_v, k, v.z + 1));
         }
 
@@ -550,18 +658,130 @@ async function FileReader(e) {
       });
 
       reader.ref._forEach(([ k, v ]) => {
-        if (v.z == -1)
+        if (v.z == 0)
           reader.dir[k] = {
-            z: 0,
+            z: 1,
             o: v.o
           }
       });
 
-      console.log(reader.dir);
+      //const simplify = ([ k, v ]) => [ k, v.o?._$map(simplify) ];
 
-      const simplify = ([ k, v ]) => [ k, v.o?._$map(simplify) ];
+      const chunksTemp = {};
+      for (const [ type, strands ] of chunks._ens()) {
+        chunksTemp[type] = {};
+        for (const [ strand, vs ] of strands._ens()) {
+          chunksTemp[type][strand] = [];
+          const testGroup = async (group, full) => {
+            let accepted = [];
+            let rejected = [];
 
-      console.log(flat)
+            let range = [ Infinity, -Infinity ];
+            let cacheLength = 0;
+            for (const v of vs) {
+              range = [ min(range[0], v.r[0]), max(range[1], v.r[1]) ];
+
+              let fullChunk = '';
+              const decoder = new TextDecoder();
+              const write = new WritableStream({
+                write(chunk) {
+                  fullChunk += decoder.decode(chunk);
+                },
+                close() {
+                  let { accepted: thisAccepted, rejected: thisRejected } = readFLSsByKey(fullChunk, group ?
+                    { group } :
+                    flat.k_map(group => { return { group }; })
+                  );
+
+                  if ((group || full) && thisAccepted)
+                    accepted = accepted.concat(thisAccepted);
+
+                  if (thisRejected) {
+                    if (!group && !full) {
+                      thisRejected = thisRejected.map(v => {
+                        const flatObj = flat[v.group];
+
+                        return writeFLS({
+                          ...v,
+                          parents: flatObj?.map(v => v.p).flat(),
+                          zIndex: flatObj?.map(v => v.z).flat()
+                        });
+                      });
+                      rejected = rejected.concat(thisRejected);
+
+                      cacheLength += thisRejected.join('\n').length;
+                      if (cacheLength >= global.settings.readerCacheMax) {
+                        cacheLength = 0;
+                        chunksTemp[type][strand].push({
+                          u: URL.createObjectURL(new Blob([ rejected.join('\n') ])).replace('blob:',' ').trim(),
+                          r: range
+                        });
+
+                        thisRejected = [];
+                        range = [ Infinity, -Infinity ];
+                      }
+                    } else if (full)
+                      rejected = rejected.concat(thisRejected);
+                  }
+                },
+                abort(err) { console.error(err); },
+              });
+
+              const blob = await fetch(`blob:${v.u}`, { cache: 'no-store' }).then(r => r.blob());
+
+              const stream = blob.stream();
+              await stream.pipeTo(write);
+            }
+
+            return full ?
+              { accepted, rejected } :
+              (group ? { accepted } : { lines: rejected, range, cacheLength });
+          }
+
+          let { lines, range, cacheLength } = await testGroup();
+          for (const [ group, groups ] of flat._ens()) {
+            const { accepted } = await testGroup(group);
+            if (accepted.length) {
+              const starts = accepted.map(v => v.starts).flat();
+              const ends = accepted.map(v => v.ends).flat();
+              range = [ min(range[0], ...starts), max(range[1], ...ends) ];
+
+              void (function(line) {
+                lines.push(line);
+                cacheLength += line.length;
+              })(writeFLS({
+                line: accepted.map(v => v.line).min(),
+                starts: accepted.map(v => v.starts).flat(),
+                ends: accepted.map(v => v.ends).flat(),
+                group,
+                parents: groups.map(v => v.p),
+                zIndex: groups.map(v => v.z),
+              }));
+
+              if (cacheLength >= global.settings.readerCacheMax) {
+                cacheLength = 0;
+                chunksTemp[type][strand].push({
+                  u: URL.createObjectURL(new Blob([ lines.join('\n') ])).replace('blob:',' ').trim(),
+                  r: range
+                });
+
+                lines = [];
+              }
+            }
+          }
+
+          if (lines.length)
+            chunksTemp[type][strand].push({
+              u: URL.createObjectURL(new Blob([ lines.join('\n') ])).replace('blob:',' ').trim(),
+              r: range
+            });
+
+          for (const { u } of vs)
+            URL.revokeObjectURL(`blob:${u}`);
+        }
+      }
+
+      return chunksTemp;
     }
   };
 
@@ -609,7 +829,7 @@ async function FileReader(e) {
 
         fileSaveNames.push({ name, metaData: [] });
 
-        (function($file) {
+        void (function($file) {
           $file.setAttr('raw-name', file.name);
           $file.setAttr('process-name', name);
 
@@ -668,13 +888,13 @@ async function FileReader(e) {
         });
 
         console.time(file.name);
-        console.profile(file.name);
+        // console.profile(file.name);
 
         const stream = file.stream();
         await stream.pipeTo(streamHandler);
 
         console.timeEnd(file.name);
-        console.profileEnd(file.name);
+        // console.profileEnd(file.name);
       }
 
       resolve({ type: 'done', data: { fileSaveNames } });
@@ -687,8 +907,7 @@ async function FileReader(e) {
 
     switch (type) {
       case 'done': {
-        while (metadataParser.some(v => !v))
-          await new Promise(r => requestIdleCallback(r));
+        await Promise.all(metadataParser);
 
         fileSaveNames.forEach(
           ({ name, metaData }) => (function($file) {

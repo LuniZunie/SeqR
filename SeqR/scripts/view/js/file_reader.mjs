@@ -228,6 +228,45 @@ async function FileReader(e) {
       if (rejected)
         return;
 
+      const clearCache = () => {
+        if (cacheTotal >= global.settings.readerCacheMax || emptyCache)
+          chunkCaches = chunkCaches._$filter(([ type, strand ]) =>
+            void strand._forEach(([ strand, groups ]) =>
+              groups._$map(([ group, v ]) => [
+                group,
+                v.reduce((sum, { v, l: length }) => [
+                  `${sum[0]}\n${writeFLS_short(v)}`,
+                  [ min(sum[1][0], v.s), max(sum[1][1], v.e) ],
+                  sum[2] + length
+                ], [ '', [ Infinity, -Infinity ], 0 ])
+              ])._sort(([ , v_a ], [ , v_b ]) =>
+                v_b[2] - v_a[2]
+              ).forEach(([ group, [ v, range, len ] ]) => {
+                if (!emptyCache && cacheTotal <= global.settings.readerCacheMin)
+                  return;
+
+                cacheTotal -= len;
+
+                chunks[type] ??= {};
+                chunks[type][strand] ??= {};
+                chunks[type][strand][group] ??= [];
+
+                chunks[type][strand][group].push({
+                  u: URL.newObjectURL(new Blob([ v.slice(1) ])).replace('blob:',' ').trim(),
+                  r: range
+                });
+
+                delete chunkCaches[type][strand][group];
+                if (chunkCaches[type][strand]._len() == 0) {
+                  delete chunkCaches[type][strand];
+                  if (chunkCaches[type]._len() == 0)
+                    delete chunkCaches[type];
+                }
+              }
+            )) || !emptyCache
+          );
+      };
+
       ++lineNum;
       if (line[0] == '#') { // comment defintions should only be at the start of the line
         if (line[1] == '#' && line[2] != '#' && line.trim() != '##') // meta-data
@@ -269,13 +308,13 @@ async function FileReader(e) {
             r('done');
           }));
 
-        return;
+        return clearCache();
       } else if (line.startsWith('browser') || line.startsWith('track'))
-        return;
+        return clearCache();
 
       let [ seqid, source, type, start, end, score, strand, phase, ...group ] = line.split(lineSplitRegExps.gff);
       if (group.length > 1 || !phase)
-        return;
+        return clearCache();
 
       group = (v =>
         misc == 'gft' ?
@@ -305,48 +344,49 @@ async function FileReader(e) {
         e: [ end ],
       }, l: length });
 
-      if (cacheTotal >= global.settings.readerCacheMax || emptyCache)
-        chunkCaches = chunkCaches._$filter(([ type, strand ]) =>
-          void strand._forEach(([ strand, groups ]) =>
-            groups._$map(([ group, v ]) => [
-              group,
+      clearCache();
+    },
+    gff3: function(line, emptyCache, misc) {
+      if (rejected)
+        return;
+
+      reader.dir ??= {};
+      reader.ref ??= {};
+      const clearCache = () => {
+        if (cacheTotal >= global.settings.readerCacheMax || emptyCache)
+          chunkCaches = chunkCaches._$filter(([ type, caches ]) =>
+            void caches._$map(([ k, v ]) => [
+              k,
               v.reduce((sum, { v, l: length }) => [
                 `${sum[0]}\n${writeFLS_short(v)}`,
-                [ min(sum[1][0], v.s), max(sum[1][1], v.e) ],
+                [
+                  min(sum[1][0], v.s),
+                  max(sum[1][1], v.e)
+                ],
                 sum[2] + length
               ], [ '', [ Infinity, -Infinity ], 0 ])
             ])._sort(([ , v_a ], [ , v_b ]) =>
               v_b[2] - v_a[2]
-            ).forEach(([ group, [ v, range, len ] ]) => {
+            ).forEach(([ k, [ v, range, len ] ]) => {
               if (!emptyCache && cacheTotal <= global.settings.readerCacheMin)
                 return;
 
               cacheTotal -= len;
 
               chunks[type] ??= {};
-              chunks[type][strand] ??= {};
-              chunks[type][strand][group] ??= [];
+              chunks[type][k] ??= [];
 
-              chunks[type][strand][group].push({
-                u: URL.createObjectURL(new Blob([ v.slice(1) ])).replace('blob:',' ').trim(),
+              chunks[type][k].push({
+                u: URL.newObjectURL(new Blob([ v.slice(1) ])).replace('blob:',' ').trim(),
                 r: range
               });
 
-              delete chunkCaches[type][strand][group];
-              if (chunkCaches[type][strand]._len() == 0) {
-                delete chunkCaches[type][strand];
-                if (chunkCaches[type]._len() == 0)
-                  delete chunkCaches[type];
-              }
-            }
-          )) || !emptyCache
-        )
-    },
-    gff3: function(line, emptyCache, misc) {
-      reader.dir ??= {};
-      reader.ref ??= {};
-      if (rejected)
-        return;
+              delete chunkCaches[type][k];
+              if (chunkCaches[type]._len() == 0)
+                delete chunkCaches[type];
+            }) || !emptyCache
+          );
+      };
 
       ++lineNum;
       if (line[0] == '#') { // comment defintions should only be at the start of the line
@@ -388,13 +428,13 @@ async function FileReader(e) {
             r('done');
           }));
 
-        return;
+        return clearCache();
       } else if (line.startsWith('browser') || line.startsWith('track'))
-        return;
+        return clearCache();
 
       let [ seqid, source, type, start, end, score, strand, phase, ...attrs ] = line.split(lineSplitRegExps.gff3);
       if (attrs.length > 1 || !phase)
-        return;
+        return clearCache();
 
       attrs = (v => v == '.' ? {} : Object.fromEntries(v?.split(';')?.map(v =>
         v.split('=')
@@ -438,57 +478,62 @@ async function FileReader(e) {
         p: parents,
       }, l: length });
 
-      if (cacheTotal >= global.settings.readerCacheMax || emptyCache) {
-        chunkCaches = chunkCaches._$filter(([ type, caches ]) =>
-          void caches._$map(([ k, v ]) => [
-            k,
-            v.reduce((sum, { v, l: length }) => [
-              `${sum[0]}\n${writeFLS_short(v)}`,
-              [
-                min(sum[1][0], v.s),
-                max(sum[1][1], v.e)
-              ],
-              sum[2] + length
-            ], [ '', [ Infinity, -Infinity ], 0 ])
-          ])._sort(([ , v_a ], [ , v_b ]) =>
-            v_b[2] - v_a[2]
-          ).forEach(([ k, [ v, range, len ] ]) => {
-            if (!emptyCache && cacheTotal <= global.settings.readerCacheMin)
-              return;
-
-            cacheTotal -= len;
-
-            chunks[type] ??= {};
-            chunks[type][k] ??= [];
-
-            chunks[type][k].push({
-              u: URL.createObjectURL(new Blob([ v.slice(1) ])).replace('blob:',' ').trim(),
-              r: range
-            });
-
-            delete chunkCaches[type][k];
-            if (chunkCaches[type]._len() == 0)
-              delete chunkCaches[type];
-          }) || !emptyCache
-        );
-      }
+      clearCache();
     },
     bed: function(line, emptyCache, misc) {
       if (rejected)
         return;
 
+      const clearCache = () => {
+        if (cacheTotal >= global.settings.readerCacheMax || emptyCache)
+          chunkCaches = chunkCaches._$filter(([ chrom, caches ]) =>
+            void caches._$map(([ k, v ]) => [
+              k,
+              v.reduce((sum, { v, l: length }) => [
+                `${sum[0]}\n${writeFLS_short(v)}`,
+                [
+                  min(sum[1][0], v.s),
+                  max(sum[1][1], v.e)
+                ],
+                sum[2] + length
+              ], [ '', [ Infinity, -Infinity ], 0 ])
+            ])._sort(([ , v_a ], [ , v_b ]) =>
+              v_b[2] - v_a[2]
+            ).forEach(([ k, [ v, range, len ] ]) => {
+              if (!emptyCache && cacheTotal <= global.settings.readerCacheMin)
+                return;
+
+              cacheTotal -= len;
+
+              chunks[chrom] ??= {};
+              chunks[chrom][k] ??= [];
+
+              chunks[chrom][k].push({
+                u: URL.newObjectURL(new Blob([ v.slice(1) ])).replace('blob:',' ').trim(),
+                r: range
+              });
+
+              delete chunkCaches[chrom][k];
+              if (chunkCaches[chrom]._len() == 0)
+                delete chunkCaches[chrom];
+            }) || !emptyCache
+          );
+      }
+
       ++lineNum;
       if (line[0] == '#' || line.startsWith('browser') || line.startsWith('track')) // comment defintions should only be at the start of the line
-        return
+        return clearCache();
 
       let [ chrom, start, end, name, score, strand, thickStart, thickEnd, rgb, blockCount, blockSizes, blockStarts ] = line.split(lineSplitRegExps.bed);
+      if (!chrom || !start || !end)
+        return clearCache();
 
-      const length = start.length + end.length + blockCount.length + blockSizes.length + blockStarts.length + (++evalLineNum).toString().length + 6;
+      const length = start?.length + end?.length + blockCount?.length + blockSizes?.length + blockStarts?.length + (++evalLineNum).toString().length + 6;
 
       const numify = str => str == '.' ? undefined : +str;
-      (start = numify(start)), (end = numify(end)), (blockCount = numify(blockCount));
-      if (blockSizes.match(/,/).length + 1 != blockCount || blockStarts.match(/,/).length + 1 != blockCount)
-        return;
+      (start = numify(start)), (end = numify(end)), (blockCount = numify(blockCount) || 0);
+      if ((blockSizes?.match(/,/).length + 1) || 0 != blockCount || (blockStarts?.match(/,/).length + 1) || 0 != blockCount)
+        return clearCache();
 
       if (start < global.dataRange[0])
         global.dataRange[0] = start;
@@ -513,39 +558,7 @@ async function FileReader(e) {
         c: rgb,
       }, l: length });
 
-      if (cacheTotal >= global.settings.readerCacheMax || emptyCache)
-        chunkCaches = chunkCaches._$filter(([ chrom, caches ]) =>
-          void caches._$map(([ k, v ]) => [
-            k,
-            v.reduce((sum, { v, l: length }) => [
-              `${sum[0]}\n${writeFLS_short(v)}`,
-              [
-                min(sum[1][0], v.s),
-                max(sum[1][1], v.e)
-              ],
-              sum[2] + length
-            ], [ '', [ Infinity, -Infinity ], 0 ])
-          ])._sort(([ , v_a ], [ , v_b ]) =>
-            v_b[2] - v_a[2]
-          ).forEach(([ k, [ v, range, len ] ]) => {
-            if (!emptyCache && cacheTotal <= global.settings.readerCacheMin)
-              return;
-
-            cacheTotal -= len;
-
-            chunks[chrom] ??= {};
-            chunks[chrom][k] ??= [];
-
-            chunks[chrom][k].push({
-              u: URL.createObjectURL(new Blob([ v.slice(1) ])).replace('blob:',' ').trim(),
-              r: range
-            });
-
-            delete chunkCaches[chrom][k];
-            if (chunkCaches[chrom]._len() == 0)
-              delete chunkCaches[chrom];
-          }) || !emptyCache
-        );
+      clearCache();
     }
   };
 
@@ -594,7 +607,7 @@ async function FileReader(e) {
               const stream = blob.stream();
               await stream.pipeTo(write);
 
-              URL.revokeObjectURL(url);
+              URL.deleteObjectURL(url);
             }
             poses.sort((a, b) => a[0] - b[0]);
 
@@ -605,7 +618,7 @@ async function FileReader(e) {
             if (cacheLength >= global.settings.readerCacheMax) {
               cacheLength = 0;
               chunksTemp[type][strand].push({
-                u: URL.createObjectURL(new Blob([ lines.join('\n') ])).replace('blob:',' ').trim(),
+                u: URL.newObjectURL(new Blob([ lines.join('\n') ])).replace('blob:',' ').trim(),
                 r: range
               });
 
@@ -616,7 +629,7 @@ async function FileReader(e) {
 
           if (lines.length)
             chunksTemp[type][strand].push({
-              u: URL.createObjectURL(new Blob([ lines.join('\n') ])).replace('blob:',' ').trim(),
+              u: URL.newObjectURL(new Blob([ lines.join('\n') ])).replace('blob:',' ').trim(),
               r: range
             });
         }
@@ -713,7 +726,7 @@ async function FileReader(e) {
                       if (cacheLength >= global.settings.readerCacheMax) {
                         cacheLength = 0;
                         chunksTemp[type][strand].push({
-                          u: URL.createObjectURL(new Blob([ rejected.join('\n') ])).replace('blob:',' ').trim(),
+                          u: URL.newObjectURL(new Blob([ rejected.join('\n') ])).replace('blob:',' ').trim(),
                           r: range
                         });
 
@@ -761,7 +774,7 @@ async function FileReader(e) {
               if (cacheLength >= global.settings.readerCacheMax) {
                 cacheLength = 0;
                 chunksTemp[type][strand].push({
-                  u: URL.createObjectURL(new Blob([ lines.join('\n') ])).replace('blob:',' ').trim(),
+                  u: URL.newObjectURL(new Blob([ lines.join('\n') ])).replace('blob:',' ').trim(),
                   r: range
                 });
 
@@ -772,12 +785,12 @@ async function FileReader(e) {
 
           if (lines.length)
             chunksTemp[type][strand].push({
-              u: URL.createObjectURL(new Blob([ lines.join('\n') ])).replace('blob:',' ').trim(),
+              u: URL.newObjectURL(new Blob([ lines.join('\n') ])).replace('blob:',' ').trim(),
               r: range
             });
 
           for (const { u } of vs)
-            URL.revokeObjectURL(`blob:${u}`);
+            URL.deleteObjectURL(`blob:${u}`);
         }
       }
 

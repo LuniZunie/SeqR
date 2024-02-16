@@ -400,7 +400,7 @@ Number.isFloat = function(num) {
 Object.defineProperty(Number.prototype, 'ceil', {
   enumerable: false,
   value: function(intv = 1) {
-    return Math.ceil(this * intv) / intv;
+    return Math.ceil(this / intv) * intv;
   }
 });
 Object.defineProperty(Number.prototype, 'cl', {
@@ -410,7 +410,7 @@ Object.defineProperty(Number.prototype, 'cl', {
 Object.defineProperty(Number.prototype, 'round', {
   enumerable: false,
   value: function(intv = 1) {
-    return Math.round(this * intv) / intv;
+    return Math.round(this / intv) * intv;
   }
 });
 Object.defineProperty(Number.prototype, 'rnd', {
@@ -420,7 +420,7 @@ Object.defineProperty(Number.prototype, 'rnd', {
 Object.defineProperty(Number.prototype, 'floor', {
   enumerable: false,
   value: function(intv = 1) {
-    return Math.floor(this * intv) / intv;
+    return Math.floor(this / intv) * intv;
   }
 });
 Object.defineProperty(Number.prototype, 'flr', {
@@ -635,9 +635,38 @@ Object.defineProperty(String.prototype, 'width', {
     const width = $span.getBoundingClientRect().width;
 
     $span.memRmv();
-    $span = null;
 
     return width;
+  }
+});
+Object.defineProperty(String.prototype, 'height', {
+  enumerable: false,
+  value: function(font = '16px sans-serif') {
+    let $span = document.createElement('span');
+    $span.style.font = font;
+    $span.innerHTML = this;
+
+    document.body.appendChild($span);
+    const height = $span.getBoundingClientRect().height;
+
+    $span.memRmv();
+
+    return height;
+  }
+});
+Object.defineProperty(String.prototype, 'ex', {
+  enumerable: false,
+  value: function($parent = document.documentElement) {
+    let $span = document.createElement('span');
+    $span.style.fontSize = '1ex';
+    $span.innerHTML = this;
+
+    $parent.appendChild($span);
+    const height = $span.getBoundingClientRect().height;
+
+    $span.memRmv();
+
+    return height;
   }
 });
 Object.defineProperty(String.prototype, 'splitOnLast', {
@@ -651,6 +680,12 @@ Object.defineProperty(String.prototype, 'matchOne', {
   enumerable: false,
   value: function(pattern) {
     return this.match(pattern)?.[0];
+  }
+});
+Object.defineProperty(String.prototype, 'capitalize', {
+  enumerable: false,
+  value: function() {
+    return this.charAt(0).toUpperCase() + this.slice(1);
   }
 });
 
@@ -741,7 +776,55 @@ Object.defineProperty(Document.prototype, 'createElementByQs', {
   }
 });
 
-[ Element ].forEach(obj => {
+[ Element ].forEach(obj => { // change to Node.prototype
+  Object.defineProperty(obj.prototype, 'getComputedStyle', {
+    enumerable: false,
+    value: function(property, $pseudo) {
+      if (property !== undefined)
+        return getComputedStyle(this, $pseudo)[property.split('-').map((v, i) =>
+          i ? v.capitalize() : v
+        ).join('')];
+      else
+        return getComputedStyle(this, $pseudo);
+    }
+  });
+  Object.defineProperty(obj.prototype, 'getCS', {
+    enumerable: false,
+    value: obj.prototype.getComputedStyle
+  });
+  Object.defineProperty(obj.prototype, 'getComputedStyles', {
+    enumerable: false,
+    value: function($pseudo, ...properties) {
+      if (properties.length)
+        return (
+          cs => Object.fromEntries(properties.map(v =>
+            v.split('-').map((v, i) =>
+              i ? v.capitalize() : v
+            ).join('')
+          ).map(v => [ v, cs[v] ]).filter(v => v[1] !== undefined))
+        )(getComputedStyle(this, $pseudo));
+      else
+        return getComputedStyle(this, $pseudo);
+    }
+  });
+  Object.defineProperty(obj.prototype, 'getCSs', {
+    enumerable: false,
+    value: obj.prototype.getComputedStyle
+  });
+  Object.defineProperty(obj.prototype, 'setCSS', {
+    enumerable: false,
+    value: function(css) {
+      this.style.cssText = css._reduce((str, [ k, v ]) => `${str}${k}:${v};`, '');
+      return this;
+    }
+  });
+  Object.defineProperty(obj.prototype, 'addCSS', {
+    enumerable: false,
+    value: function(css) {
+      this.style.cssText += css._reduce((str, [ k, v ]) => `${str}${k}:${v};`, '');
+      return this;
+    }
+  });
   Object.defineProperty(obj.prototype, 'icon', {
     enumerable: false,
     value: function(icon, invert, cw = true) {
@@ -788,6 +871,49 @@ Object.defineProperty(Document.prototype, 'createElementByQs', {
       };
     }
   });
+
+  Object.defineProperty(obj.prototype, 'scrollbarWidth', {
+    enumerable: false,
+    value: function() {
+      return this.offsetWidth - this.clientWidth;
+    }
+  });
+  Object.defineProperty(obj.prototype, 'scrollbarHeight', {
+    enumerable: false,
+    value: function() {
+      return this.offsetHeight - this.clientHeight;
+    }
+  });
+
+  [ 'left', 'right', 'top', 'bottom' ].forEach(side => {
+    const scale = side == 'left' || side == 'right' ? 'Width' : 'Height';
+    const Side = side.capitalize();
+    Object.defineProperty(obj.prototype, `outer${Side}`, { // pos + mar
+      enumerable: false,
+      value: function() { // (pos + mar)
+        return this.rect()[side];
+      }
+    });
+    Object.defineProperty(obj.prototype, `inner${Side}`, { // pos + mar + bor
+      enumerable: false,
+      value: function() { // (bor) + (pos + mar)
+        return +this.getCS(`border-${side}-width`).replace('px', '') + this[`outer${Side}`]();
+      }
+    });
+    Object.defineProperty(obj.prototype, `scrollbar${Side}`, { // pos + mar + bor + pad
+      enumerable: false,
+      value: function() { // (pos + mar + bor + srlbr + pad) - ((pos + mar + bor + srlbr + pad) - (pos + mar + bor) - (pad))
+        return this[`inner${Side}`]() + +this.getCS(`padding-${side}`).replace('px', '');
+      }
+    });
+    Object.defineProperty(obj.prototype, `content${Side}`, { // pos + mar + bor + srlbr + pad
+      enumerable: false,
+      value: function() { // (pos + mar + bor + pad) + (srlbr)
+        return this[`scrollbar${Side}`]() + (this[`scrollbar${scale}`]);
+      }
+    });
+  });
+
   Object.defineProperty(obj.prototype, 'qs', {
     enumerable: false,
     value: Element.prototype.querySelector
@@ -825,9 +951,13 @@ Object.defineProperty(Document.prototype, 'createElementByQs', {
         this.parentNode.replaceChild(clone, this);
         clone.parentNode.removeChild(clone);
 
-        clone = null;
+        this.remove();
+        clone.remove();
       } else
         this.remove();
+
+      this.qsa('*')?.memRmv();
+      this.setAttribute('memory-removed', true);
     },
   });
   Object.defineProperty(obj.prototype, 'memRmv', {
@@ -899,15 +1029,17 @@ Object.defineProperty(Document.prototype, 'createElementByQs', {
   Object.defineProperty(obj.prototype, 'prependChild', {
     enumerable: false,
     value: function($, target = 0) {
-      target ??= 0;
-      if (!($ instanceof Node)) {
+      if (!(target instanceof Node || Number.isInteger(target) || target == Infinity || target == -Infinity))
+        target = 0;
+
+      if (!($ instanceof Node || $ instanceof SVGElement)) {
         if (typeof $ == 'string')
           $ = this.createElementByQs($);
         else
           throw 'Bad Element Passed';
       }
 
-      if (target instanceof Node) {
+      if (target instanceof Node || $ instanceof SVGElement) {
         this.insertBefore($, target);
       } else if (Number.isInteger(target) || target == Infinity || target == -Infinity) {
         if (target >>> 31 || target == -Infinity)
@@ -922,15 +1054,17 @@ Object.defineProperty(Document.prototype, 'createElementByQs', {
   Object.defineProperty(obj.prototype, 'appendChild', {
     enumerable: false,
     value: function($, target = Infinity) {
-      target ??= Infinity;
-      if (!($ instanceof Node)) {
+      if (!(target instanceof Node || Number.isInteger(target) || target == Infinity || target == -Infinity))
+        target = Infinity;
+
+      if (!($ instanceof Node || $ instanceof SVGElement)) {
         if (typeof $ == 'string')
           $ = this.createElementByQs($);
         else
           throw 'Bad Element Passed';
       }
 
-      if (target instanceof Node)
+      if (target instanceof Node || $ instanceof SVGElement)
         this.insertBefore($, target.nextSibling);
       else if (Number.isInteger(target) || target == Infinity || target == -Infinity) {
         if (target >>> 31 || target == -Infinity)
@@ -945,15 +1079,17 @@ Object.defineProperty(Document.prototype, 'createElementByQs', {
   Object.defineProperty(obj.prototype, 'insertChild', {
     enumerable: false,
     value: function($, target = 0) {
-      target ??= 0;
-      if (!($ instanceof Node)) {
+      if (!(target instanceof Node || Number.isInteger(target) || target == Infinity || target == -Infinity))
+        target = 0;
+
+      if (!($ instanceof Node || $ instanceof SVGElement)) {
         if (typeof $ == 'string')
           $ = this.createElementByQs($);
         else
           throw 'Bad Element Passed';
       }
 
-      if (target instanceof Node) {
+      if (target instanceof Node || $ instanceof SVGElement) {
         if (target.parentNode.isEqualNode(this))
           this.replaceChild($, target);
         else
@@ -1404,6 +1540,7 @@ Object.defineProperty(CanvasRenderingContext2D.prototype, 'rect', {
     this.fillRect(...args.flat(Infinity));
   },
 });
+
 Object.defineProperty(Object, 'deepMerge', {
   enumerable: false,
   value: function(target, ...sources) {
@@ -1414,14 +1551,21 @@ Object.defineProperty(Object, 'deepMerge', {
 
     const source = sources.shift();
     if (isObject(target) && isObject(source)) {
-      for (const key in source) {
-        if (isObject(source[key])) {
-          if (!target[key])
-            Object.assign(target, { [key]: {} });
+      for (const k in source) {
+        if (Array.isArray(source[k])) {
+          if (target[k] === undefined)
+            Object.assign(target, { [k]: [] });
+          else if (!Array.isArray(target[k]))
+            target[k] = [ target[k] ];
 
-          Object.deepMerge(target[key], source[key]);
+          target[k] = target[k].concat(source[k]);
+        } else if (isObject(source[k])) {
+          if (target[k] === undefined)
+            Object.assign(target, { [k]: {} });
+
+          Object.deepMerge(target[k], source[k]);
         } else
-          Object.assign(target, { [key]: source[key] });
+          Object.assign(target, { [k]: source[k] });
       }
     }
 

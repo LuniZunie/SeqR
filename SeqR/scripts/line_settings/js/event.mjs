@@ -40,8 +40,8 @@ page.events = new Events({
       body.cursorPosition(0);
     },
     mouseup: function(e) {
-      [ 'body > .brightness > .slider', 'body > .color_spectrum > canvas.picker' ].forEach(
-        selector => body.qs(selector).setAttr('mousedown', false)
+      [ 'body > .brightness > .slider', 'body > .color_spectrum > canvas.picker' ].forEach(selector =>
+        body.qs(selector).setAttr('mousedown', false)
       );
 
       Update();

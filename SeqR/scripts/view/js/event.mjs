@@ -82,9 +82,9 @@ page.events = new Events({
         ),
         body.qs( // time
           'body > .side > .content > .groups > .group:not(.template) > .content > .data:not(.template) > .content'
-        ).gen(-Infinity, 0).flat(Infinity).map(
+        )?.gen(-Infinity, 0).flat(Infinity).map(
           $ => $ instanceof Element ? parseTransition($).max() : 0
-        ).max()
+        ).max() ?? 0
       );
     },
     mouseup: [
@@ -94,11 +94,11 @@ page.events = new Events({
             { selector: 'body > .top > .delete_data.button > .confirm', hideOnClick: true },
             { selector: 'body > .top > .export.extensions' },
             { selector: 'body > .top > .export.name' },
-            { selector: 'body > .data_select' },
+            { selector: 'body > .data_select', includeSelf: true },
             { selector: 'body > .line_settings:not(.hide)', extra: 'line_setttings' },
             { selector: 'body > .cover', checks: [ 'body > .data_select', 'body > .line_settings:not(.hide)', { selector: 'body > .settings', hide: true } ], hideOnClick: true, capture: true },
           ].forEach(
-            ({ selector, $class, checks, hideOnClick, capture, extra }) => (function($) {
+            ({ selector, $class, checks, hideOnClick, includeSelf, capture, extra }) => (function($) {
               $class ??= 'hide';
               checks ??= [];
               if (!$ || $.hasClass($class))
@@ -108,7 +108,7 @@ page.events = new Events({
               if (!page.mouseDownOver.childOf($e, true) && !$e.childOf(page.mouseDownOver, true))
                 return;
 
-              if ((hideOnClick || !$e.childOf($)) && checks.every(selector => !$e.childOf(body.qs(selector.selector ?? selector), true))) {
+              if ((hideOnClick || !$e.childOf($, includeSelf)) && checks.every(selector => !$e.childOf(body.qs(selector.selector ?? selector), true))) {
                 if (capture)
                   e?.stopPropagation();
 
@@ -493,13 +493,13 @@ page.events = new Events({
 
       const { x, b, w } = this.rect();
       const x_mx = this.gen(-1).rect().right;
-      if (x + +getComputedStyle(this).paddingLeft.replace(/[^0-9\.e\+-]/g, '') > x_mx)
+      if (x + +this.getCS('padding-left').replace(/[^0-9\.e\+-]/g, '') > x_mx)
         return this.setAttr('animate', true);
       else
         this.setAttr('animate', false);
 
       const text = this.getAttr('file');
-      const center = (x + w / 2 + text.width(getComputedStyle(this).font) / 2 + vmin()) < x_mx;
+      const center = (x + w / 2 + text.width(this.getCS('font')) / 2 + vmin()) < x_mx;
 
       const tooltip = new Tooltip('tip',
         text,
@@ -922,7 +922,7 @@ page.events = new Events({
             ...(function(extension) { // parameter 1
               switch (extension) {
                 case 'image/svg+xml':
-                  return [ URL.createObjectURL(new Blob([ body.qs('body > .content > .easel > svg.paper:not(.disabled, .template)').outerHTML ])), null ];
+                  return [ URL.newObjectURL(new Blob([ body.qs('body > .content > .easel > svg.paper:not(.disabled, .template)').outerHTML ])), null ];
                 default:
                   return [ body.qs('body > .content > .easel > svg.paper:not(.disabled, .template) > image:not(.template)').href.baseVal, extension ];
               };

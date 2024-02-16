@@ -59,7 +59,7 @@ window.addEventListener('message', function(e) {
 
 function Loaded() {
   page.events.add(window, 'window');
-  doc.qsa('[events]').forEach($ => {
+  html.qsa('[events]').forEach($ => {
     const evs = $.getAttr('events');
     if (evs !== null && evs !== undefined)
       page.events.add($, ...evs.split(/\s/));

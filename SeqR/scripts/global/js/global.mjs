@@ -16,14 +16,35 @@
 
 export {
   doc,
+  html,
+  head,
   body,
   root,
   rootStyle,
   global,
   min,
   max,
+  avg,
   vmin,
   vmax,
+  vw,
+  vh,
+  cm,
+  cm_x,
+  cm_y,
+  mm,
+  mm_x,
+  mm_y,
+  in_,
+  in_x,
+  in_y,
+  pt,
+  pt_x,
+  pt_y,
+  pc,
+  pc_x,
+  pc_y,
+  parseCSSPosition,
   bool,
   repeat,
   prandom,
@@ -50,8 +71,11 @@ export {
   Disk,
 };
 
-const doc = document.documentElement;
+const doc = document;
+
+const html = document.documentElement;
 const body = document.body;
+const head = document.head;
 
 const root = document.querySelector(':root');
 const rootStyle = getComputedStyle(root);
@@ -302,6 +326,10 @@ const global = {
     color_i: 0,
   },
   update: {
+    tick: {
+      fixed: 0,
+      loose: 0,
+    },
     pause: {
       fixed: false,
       loose: false,
@@ -309,13 +337,46 @@ const global = {
   },
   disk: null,
   pagePromises: [],
+  dpi: {
+    x: 96,
+    y: 96,
+  },
 };
 global.prandom.generator = PrandomGenerator(global.prandom.seed);
 
+Object.defineProperty(URL, 'newObjectURL', {
+  enumerable: false,
+  value: function(...args) {
+    const url = URL.createObjectURL(...args);
+    sessionStorage.setItem('objectUrls', (sessionStorage.getItem('objectUrls') ?? '').split(',').concat(url));
+
+    return url;
+  },
+});
+
+Object.defineProperty(URL, 'deleteObjectURL', {
+  enumerable: false,
+  value: function(url, ...args) {
+    URL.revokeObjectURL(url, ...args);
+    sessionStorage.setItem('objectUrls', (sessionStorage.getItem('objectUrls') ?? '').split(',').filter(u => u != url));
+  },
+});
+
 async function LoadInsertedDocuments() {
-  const loadedDocs = {};
+  let loadedDocs = {};
   async function loadDoc(src) {
-    return loadedDocs[src] ?? await fetch(src).then(r => r.text()).then(t => loadedDocs[src] = t.replace(/<!--[\s\S]*?-->/g, ''));
+    if (loadedDocs[src])
+      return await new Promise(r => // stop glitchy loading
+        requestAnimationFrame(() =>
+          r(loadedDocs[src])
+        )
+      );
+
+    return await fetch(src).then(r =>
+      r.text()
+    ).then(t =>
+      loadedDocs[src] = t.replace(/<!--[\s\S]*?-->/g, '')
+    );
   }
 
   console.time('LoadInsertedDocuments');
@@ -346,7 +407,9 @@ async function LoadInsertedDocuments() {
 
             const obj = Object.fromEntries($div.childNodes.filter($ =>
               $.tagName == 'ENTRY'
-            ).map($ => [ $.qs('key:last-of-type').innerText, $.qs('value:last-of-type').innerHTML ]));
+            ).map($ =>
+              [ $.qs('key:last-of-type').innerText, $.qs('value:last-of-type').innerHTML ]
+            ));
 
             $.getAttr('key').split(',').forEach(k => {
               const $div = document.createElement('div');
@@ -357,6 +420,7 @@ async function LoadInsertedDocuments() {
             });
 
             $.memRmv();
+            $div.memRmv();
           });
           break;
         } case 'dictionary/plain': {
@@ -366,21 +430,58 @@ async function LoadInsertedDocuments() {
 
             const obj = Object.fromEntries($div.childNodes.filter($ =>
               $.tagName == 'ENTRY'
-            ).map($ => [ $.qs('key:last-of-type').innerText, $.qs('value:last-of-type').innerText ]));
+            ).map($ =>
+              [ $.qs('key:last-of-type').innerText, $.qs('value:last-of-type').innerText ]
+            ));
 
-            $.getAttr('key').split(',').forEach(k => {
-              $.parentNode.prependChild(document.createTextNode(obj[k]), $);
-            });
+            $.getAttr('key').split(',').forEach(k =>
+              $.parentNode.prependChild(document.createTextNode(obj[k]), $)
+            );
 
             $.memRmv();
+            $div.memRmv();
           });
           break;
         }
       }
 
+  loadDoc = null;
   console.timeEnd('LoadInsertedDocuments');
 }
-requestAnimationFrame(() => global.pagePromises.push(LoadInsertedDocuments()));
+
+async function RemoveObjectUrls() {
+  sessionStorage.removeItem('objectUrls');
+}
+
+async function GetDPI() {
+  const { dpi_x, dpi_y } = await new Promise(r =>
+    requestAnimationFrame(() =>
+      r(body.appendChild('div').setCSS({
+        width: '1in',
+        height: '1in',
+        position: 'absolute',
+        top: '-100%',
+        left: '-100%',
+      }))
+    )
+  ).then($div => {
+    const dpi_x = $div.offsetWidth;
+    const dpi_y = $div.offsetHeight;
+
+    $div.memRmv();
+
+    return { dpi_x, dpi_y };
+  });
+
+  global.dpi.x = dpi_x;
+  global.dpi.y = dpi_y;
+}
+
+requestAnimationFrame(() => {
+  global.pagePromises.push(RemoveObjectUrls());
+  global.pagePromises.push(LoadInsertedDocuments());
+  global.pagePromises.push(GetDPI());
+});
 
 Object.defineProperty(global.extensions.gff, 'evalEscChars', {
   enumerable: false,
@@ -408,8 +509,8 @@ Object.defineProperty(global.extensions.gff, 'evalEscChars', {
         ...escChars,
       };
 
-    return escChars._reduce(
-      (str, [ encode, decode ]) => str.replace(new RegExp(encode, 'gi'), decode), str
+    return escChars._reduce((str, [ encode, decode ]) =>
+      str.replace(new RegExp(encode, 'gi'), decode), str
     );
   },
 });
@@ -427,12 +528,131 @@ function max(...paras) {
   return Math.max(...paras);
 }
 
+function avg(...paras) {
+  return Math.avg(...paras);
+}
+
 function vmin(mod = 1) {
   return min(innerWidth, innerHeight) / 100 * mod;
 }
 
 function vmax(mod = 1) {
   return max(innerWidth, innerHeight) / 100 * mod;
+}
+
+function vw(mod = 1) {
+  return innerWidth / 100 * mod;
+}
+
+function vh(mod = 1) {
+  return innerHeight / 100 * mod;
+}
+
+function cm(mod = 1) {
+  return mod * (global.dpi.x + global.dpi.y) / 1.27;
+}
+
+function cm_x(mod = 1) {
+  return mod * global.dpi.x / 2.54;
+}
+
+function cm_y(mod = 1) {
+  return mod * global.dpi.y / 2.54;
+}
+
+function mm(mod = 1) {
+  return mod * (global.dpi.x + global.dpi.y) / 12.7;
+}
+
+function mm_x(mod = 1) {
+  return mod * global.dpi.x / 25.4;
+}
+
+function mm_y(mod = 1) {
+  return mod * global.dpi.y / 25.4;
+}
+
+function in_(mod = 1) {
+  return mod * (global.dpi.x + global.dpi.y) / 2;
+}
+
+function in_x(mod = 1) {
+  return mod * global.dpi.x;
+}
+
+function in_y(mod = 1) {
+  return mod * global.dpi.y;
+}
+
+function pt(mod = 1) {
+  return mod * (global.dpi.x + global.dpi.y) / 72;
+}
+
+function pt_x(mod = 1) {
+  return mod * global.dpi.x / 72;
+}
+
+function pt_y(mod = 1) {
+  return mod * global.dpi.y / 72;
+}
+
+function pc(mod = 1) {
+  return mod * (global.dpi.x + global.dpi.y) / 6;
+}
+
+function pc_x(mod = 1) {
+  return mod * global.dpi.x / 6;
+}
+
+function pc_y(mod = 1) {
+  return mod * global.dpi.y / 6;
+}
+
+function parseCSSPosition(pos, $ = html, dir = 'x') {
+  if (pos.endsWith('px'))
+    return +pos.slice(0, -2);
+  else if (pos.endsWith('%'))
+    return ($ instanceof Window ?
+      (dir == 'x' ? $.innerWidth : $.innerHeight) :
+      (dir == 'x' ? $.clientWidth : $.clientHeight)) * +pos.slice(0, -1) / 100;
+  else if (pos.endsWith('vw'))
+    return vw(+pos.slice(0, -2));
+  else if (pos.endsWith('vh'))
+    return vh(+pos.slice(0, -2));
+  else if (pos.endsWith('vmin'))
+    return vmin(+pos.slice(0, -4));
+  else if (pos.endsWith('vmax'))
+    return vmax(+pos.slice(0, -4));
+  else if (pos.endsWith('rem'))
+    return +doc.getCS('font-size').replace('px', '') * +pos.slice(0, -3);
+  else if (pos.endsWith('em'))
+    return +doc.getCS('font-size').replace('px', '') * +pos.slice(0, -2);
+  else if (pos.endsWith('ex'))
+    return '0'.ex($ instanceof Window ? html : $) * +pos.slice(0, -2);
+  else if (pos.endsWith('ch'))
+    return '0'.width(doc.getCS('font')) * +pos.slice(0, -2);
+  else if (pos.endsWith('mm'))
+    return dir == 'x' ?
+      mm_x(+pos.slice(0, -2)) :
+      mm_y(+pos.slice(0, -2));
+  else if (pos.endsWith('cm'))
+    return dir == 'x' ?
+      cm_x(+pos.slice(0, -2)) :
+      cm_y(+pos.slice(0, -2));
+  else if (pos.endsWith('in'))
+    return dir == 'x' ?
+      in_x(+pos.slice(0, -2)) :
+      in_y(+pos.slice(0, -2));
+  else if (pos.endsWith('pt'))
+    return dir == 'x' ?
+      pt_x(+pos.slice(0, -2)) :
+      pt_y(+pos.slice(0, -2));
+  else if (pos.endsWith('pc'))
+    return dir == 'x' ?
+      pc_x(+pos.slice(0, -2)) :
+      pc_y(+pos.slice(0, -2));
+  else
+    throw new Error(`Invalid position: ${pos}`);
 }
 
 function bool(v) {
@@ -498,8 +718,8 @@ function parseColor(color) {
 }
 
 function parseTransition($) {
-  return getComputedStyle($).transitionDuration.split(/,\s/).map(
-    v => +new Function(`return ${v.replace(/ms/g, '').replace(/s/g, '* 1000')};`)()
+  return getComputedStyle($).transitionDuration.split(/,\s/).map(v =>
+    +new Function(`return ${v.replace(/ms/g, '').replace(/s/g, '* 1000')};`)()
   );
 }
 
@@ -540,12 +760,11 @@ function GetAttributesObject(attrs) {
 		    	});
 
           break;
-        };
-        case 2: {
+        } case 2: {
           if (!v.includes(','))
-            path.reduce(
-              (lastPath, newPath, i) => lastPath[newPath] ??= i == path.length - 1 ? global.extensions.gff.evalEscapeChars(v, true) : {}, obj
-            );
+            path.reduce((lastPath, newPath, i) =>
+              lastPath[newPath] ??= i == path.length - 1 ? global.extensions.gff.evalEscapeChars(v, true) : {},
+            obj);
           else
             v.split(',').forEach(kv => {
               const [ k, v ] = kv.split(/:([\s\S]*)/);
@@ -558,15 +777,15 @@ function GetAttributesObject(attrs) {
     } else if (v.includes(','))
 			attrsObj[len++] = [ path, v.split(',') ];
 		else if (v instanceof Array)
-      path.reduce(
-        (lastPath, newPath, i) => lastPath[newPath] ??= i == path.length ? v.map(
-          v => global.extensions.gff.evalEscapeChars(v, true)
-         ) : {}, obj
-      );
+      path.reduce((lastPath, newPath, i) =>
+        lastPath[newPath] ??= i == path.length ?
+          v.map(v => global.extensions.gff.evalEscapeChars(v, true)) :
+          {},
+      obj);
 		else
-			path.reduce(
-        (lastPath, newPath, i) => lastPath[newPath] ??= i == path.length ? global.extensions.gff.evalEscapeChars(v, true) : {}, obj
-      );
+			path.reduce((lastPath, newPath, i) =>
+        lastPath[newPath] ??= i == path.length ? global.extensions.gff.evalEscapeChars(v, true) : {},
+      obj);
   }
 
   return obj;
@@ -582,8 +801,8 @@ function GetAttributesObject(attrs) {
  */
 function ColorArrayToColor(color, shaded, inverse) {
   const shade = color[3];
-  return `rgba(${color.slice(0, 3).map(
-    v => v.clamp(0, 255) * (shaded ? shade.clamp(0, 255) / 255 : 1) ^ (inverse ? 255 : 0)
+  return `rgba(${color.slice(0, 3).map(v =>
+    v.clamp(0, 255) * (shaded ? shade.clamp(0, 255) / 255 : 1) ^ (inverse ? 255 : 0)
   ).join(', ')})`
 }
 
@@ -645,7 +864,7 @@ function Download(url, extension, fileName, resolve) {
     const img = new Image(2048, 2048);
 
     img.src = url;
-    img.onload = () => {
+    return img.onload = () => {
       const $paper = document.createElement('canvas');
       $paper.width = img.width;
       $paper.height = img.height;
@@ -666,8 +885,6 @@ function Download(url, extension, fileName, resolve) {
       if (resolve)
         requestIdleCallback(resolve);
     };
-
-    return;
   } else {
     const $a = document.createElement('a');
     $a.href = url;
@@ -683,9 +900,9 @@ function Download(url, extension, fileName, resolve) {
 }
 
 function DrawSvgLine(style, x_1, y_1, x_2, y_2, limit) {
-  const format = (k, styles) => (
-    v => (
-      ([ v, cmd ]) => cmd instanceof Object ? [ v, cmd[k] ] : [ v, cmd ]
+  const format = (k, styles) => (v =>
+    (([ v, cmd ]) =>
+      cmd instanceof Object ? [ v, cmd[k] ] : [ v, cmd ]
     )(typeof v == 'string' ? [ v, global.lineStyles[styles][v] ] : global.lineStyles[styles]._en(v))
   )(style.l[k] || 0);
 
@@ -918,10 +1135,6 @@ function DrawSvgLine(style, x_1, y_1, x_2, y_2, limit) {
             'L', x + w * 2/3, y + h * 5/3,
             'L', x + w * 2/3, y + h,
           ];
-          return [
-            ...f(0, -2/3, 2/3, 0),
-            ...f(0, 1, 2/3, 5/3),
-          ];
         case 'circle':
           return invert ? [
             'M', x - w / 3, y + h / 2,
@@ -936,13 +1149,6 @@ function DrawSvgLine(style, x_1, y_1, x_2, y_2, limit) {
             'Q', x - w / 3, y + h * 4/3, x - w / 3, y + h / 2,
             'Q', x - w / 3, y - h / 3, x + w / 2, y - h / 3,
           ];
-          return [
-            ...m(-1/3, 1/2),
-            ...q(-1/3, 4/3, 1/2, 4/3),
-            ...q(4/3, 4/3, 4/3, 1/2),
-            ...q(4/3, -1/3, 1/2, -1/3),
-            ...q(-1/3, -1/3, -1/3, 1/2),
-          ];
         case 'dotted':
           return [
             'M', x, y - h / 3,
@@ -956,19 +1162,6 @@ function DrawSvgLine(style, x_1, y_1, x_2, y_2, limit) {
             'Q', x + w * 2/3, y + h, x + w * 2/3, y + h * 4/3,
             'Q', x + w * 2/3, y + h * 5/3, x + w / 3, y + h * 5/3,
             'Q', x, y + h * 5/3, x, y + h * 4/3,
-          ];
-          return [
-            ...m(0, -1/3),
-            ...q(0, 0, 1/3, 0),
-            ...q(2/3, 0, 2/3, -1/3),
-            ...q(2/3, -2/3, 1/3, -2/3),
-            ...q(0, -2/3, 0, -1/3),
-
-            ...m(0, 4/3),
-            ...q(0, 1, 1/3, 1),
-            ...q(2/3, 1, 2/3, 4/3),
-            ...q(2/3, 5/3, 1/3, 5/3),
-            ...q(0, 5/3, 0, 4/3),
           ];
         case 'double':
           return invert ? [
@@ -991,10 +1184,6 @@ function DrawSvgLine(style, x_1, y_1, x_2, y_2, limit) {
             'L', x + w * 2/3, y + h * 5/3,
             'L', x + w, y + h * 5/3,
             'L', x + w, y - h * 2/3,
-          ];
-          return [
-            ...f(0, -2/3, 1/3, 5/3),
-            ...f(2/3, -2/3, 1, 5/3),
           ];
       };
     })(this);
@@ -1085,61 +1274,55 @@ function DrawSvgLine(style, x_1, y_1, x_2, y_2, limit) {
   return points;
 }
 
+function LooseUpdate(fn, time = 1, scope) {
+  let i = -1;
+  while (update.loose[++i])
+    continue;
+
+  update.loose[i] = { fn, scope, time };
+
+  return i;
+}
+function DeleteLooseUpdate(id) {
+  delete update.loose[id];
+}
 function looseUpdate() {
+  global.update.tick.loose++;
   if (!global.update.pause.loose)
     try {
-      update.loose.v_forEach(
-        ({ fn, scope }) => fn.call(scope)
+      update.loose.v_forEach(({ fn, scope, time }) =>
+        global.update.tick.loose % time ? void 0 : (scope === undefined ? fn() : fn.call(scope))
       );
-    } catch (er) {
-      console.error(er);
-    }
+    } catch (err) { console.error(err); }
 
   requestIdleCallback(looseUpdate);
 }
 requestIdleCallback(looseUpdate);
 
-function fixedUpdate() {
-  if (!global.update.pause.fixed)
-    try {
-      update.fixed.v_forEach(
-        ({ fn, scope }) => fn.call(scope)
-      );
-    } catch (er) {
-      console.error(er);
-    }
-
-  requestAnimationFrame(fixedUpdate);
-}
-requestAnimationFrame(fixedUpdate);
-
-function LooseUpdate(fn) {
-  let i = -1;
-  while (update.loose[++i])
-    continue;
-
-  update.loose[i] = { fn: fn, scope: this };
-
-  return i;
-}
-
-function DeleteLooseUpdate(id) {
-  delete update.loose[id];
-}
-
-function FixedUpdate(fn) {
+function FixedUpdate(fn, time = 1, scope) {
   let i = -1;
   while (update.fixed[++i])
     continue;
 
-  update.fixed[i] = { fn: fn, scope: this };
+  update.fixed[i] = { fn, scope, time };
 
   return i;
 }
-
 function DeleteFixedUpdate(id) {
   delete update.fixed[id];
 }
+function fixedUpdate() {
+  global.update.tick.fixed++;
+  if (!global.update.pause.fixed)
+    try {
+      update.fixed.v_forEach(({ fn, scope, time }) =>
+        global.update.tick.fixed % time ? void 0 : (scope === undefined ? fn() : fn.call(scope))
+      );
+    } catch (err) { console.error(err); }
+
+  requestAnimationFrame(fixedUpdate);
+}
+requestAnimationFrame(fixedUpdate);
 
 LooseUpdate(function() {
   body.qsa('canvas.line_preview').forEach($paper => {
@@ -1156,12 +1339,12 @@ FixedUpdate(function() {
     if ($.preDecAttr('scroll-wait-ticks') > 0 || $.scrollWidth <= $.clientWidth || document.activeElement == $) //prefix because it's decremented before the check
       return;
 
-    let l = $.scrollLeft;
+    let l = $[`${Dir_1}`];
     const speed = +$.nullSetAttr('scroll-speed', 1) + +$.nullSetAttr('scroll-round', 0);
     $.setAttr('scroll-round', speed % 1);
 
     $.scrollBy(+$.nullSetAttr('scroll-direction', 1) * speed | 0, 0);
-    if (l == $.scrollLeft) {
+    if (l == $[`${Dir_1}`]) {
       $.setAttr('scroll-direction', -$.getAttr('scroll-direction'));
       $.setAttr('scroll-wait-ticks', $.nullSetAttr('scroll-wait', 1) * 30);
     }
@@ -1169,7 +1352,7 @@ FixedUpdate(function() {
 });
 
 LooseUpdate(function() {
-  doc.qsa('span[href]').forEach(span => {
+  html.qsa('span[href]').forEach(span => {
     span.style.cursor = 'pointer';
     span.onclick = function() {
       window.open(this.getAttribute('href'), this.getAttribute('target'));
@@ -1178,18 +1361,18 @@ LooseUpdate(function() {
 });
 
 FixedUpdate(function() {
-  doc.qsa('[hash].false_hidden:not([false-hidden])').forEach(
-    $ => $.setAttr('false-hidden', true)
+  html.qsa('[hash].false_hidden:not([false-hidden])').forEach($ =>
+    $.setAttr('false-hidden', true)
   );
 
-  doc.qsa('[hash][false-hidden]:not(.false_hidden)').forEach(
-    $ => $.rmvAttr('false-hidden')
+  html.qsa('[hash][false-hidden]:not(.false_hidden)').forEach($ =>
+    $.rmvAttr('false-hidden')
   );
 
-  const hash = doc.qsa('[hash]:not(.hidden, .false_hidden)').map($ => {
+  const hash = html.qsa('[hash]:not(.hidden, .false_hidden)').map($ => {
     let id = $.getAttr('hash') || $.id;
     if (!id)
-      for (let i = 0; i < 100000 && (!id || doc.getById(id) instanceof Element); i++)
+      for (let i = 0; i < 100000 && (!id || html.getById(id) instanceof Element); i++)
         id = `hash_${prandom() * 100000 << 0}`;
 
     $.setAttribute('hash', id)
@@ -1197,33 +1380,38 @@ FixedUpdate(function() {
     return id;
   }).join(',');
 
-  location.hash = hash ?? '';
-});
+  try {
+    location.hash = hash ?? ''
+  } catch (err) {};
+}, 5);
 
 addEventListener('hashchange', function(ev) {
   const hashes = ev.newURL.replace(location.origin + location.pathname, '').replace('#', '').split(',');
-  doc.qsa('[hash]').forEach(
-    $ => $.classList[hashes.includes($.getAttribute('hash')) ? 'remove' : 'add']($.getAttr('false-hidden') ? 'false_hidden' : 'hidden')
+  html.qsa('[hash]').forEach($ =>
+    $.classList[hashes.includes($.getAttribute('hash')) ? 'remove' : 'add']($.getAttr('false-hidden') ? 'false_hidden' : 'hidden')
   );
 });
 
 class Events {
-  #evs;
-  #sentEvs;
-  /**
-   * Constructs a new instance of the Events class.
-   *
-   * @param {Object} evs - The initial events object.
-   */
-  constructor(evs) {
-    this.#sentEvs = evs;
+  #events;
+  #sentEvents;
+
+  #relatedElements = new Set();
+  #memCheckUpdate = LooseUpdate(function() { // remove elements that have been removed from the DOM
+    this.#relatedElements.forEach($ => {
+      if ($.getAttr?.('memory-removed'))
+        this.#relatedElements.delete($);
+    });
+  }, 30, this);
+  constructor(events) {
+    this.#sentEvents = events;
 
     let check = true;
     try {
       for (let i = 0; i < 100000 && check; i++) {
         check = false;
-        evs = evs?.v_$map($v => {
-          let thisLevels = [ evs ];
+        events = events?.v_$map($v => {
+          let thisLevels = [ events ];
           if (typeof $v == 'string') {
             check = true;
 
@@ -1233,7 +1421,7 @@ class Events {
             return obj == $v ? undefined : obj;
           } else
             return $v?._$map(([ k_ev, v_ev ]) => {
-              thisLevels = [ $v, evs ];
+              thisLevels = [ $v, events ];
               if (v_ev instanceof Function)
                 v_ev = [ v_ev ];
 
@@ -1246,7 +1434,7 @@ class Events {
                 return [ k_ev, obj == v_ev ? undefined : obj ];
               } else
                 return [ k_ev, v_ev?.map(fnObj => {
-                  thisLevels = [ v_ev, $v, evs ];
+                  thisLevels = [ v_ev, $v, events ];
                   if (fnObj instanceof Function)
                     fnObj = [ fnObj, {} ];
 
@@ -1258,10 +1446,8 @@ class Events {
 
                     return obj == fnObj ? undefined : obj;
                   } else
-                    return fnObj?.filter(
-                      (_, i) => i < 2
-                    )?.map(v_fn => {
-                      thisLevels = [ fnObj, v_ev, $v, evs ];
+                    return fnObj?.filter((_, i) => i < 2)?.map(v_fn => {
+                      thisLevels = [ fnObj, v_ev, $v, events ];
                       if (typeof v_fn == 'string') {
                         check = true;
 
@@ -1278,35 +1464,31 @@ class Events {
       }
 
       if (check)
-        throw `(In constructor of Events) Ran out of check iterations. ${evs}`;
+        throw `(In constructor of Events) Ran out of check iterations. ${events}`;
     } catch (er) {
-      evs = {};
+      events = {};
       console.error(er);
     }
 
-    this.#evs = evs;
+    this.#events = events;
   }
-  get get() {
-    return this.#sentEvs;
-  }
-  get getFormatted() {
-    return this.#evs;
-  }
+
   /**
    * Adds event listeners to the specified elements.
    *
    * @param {Element|string|Object} $s - The element(s) or selector(s) to add event listeners to.
-   * @param {...string|Array|Object} evs - The event(s) to listen for.
+   * @param {...string|Array|Object} events - The event(s) to listen for.
    * @returns {Element|Array} - The element(s) with the event listeners added.
    */
-  add($s, ...evs) {
+  addWithScope($s, ...events) {
+    const scope = events?.pop();
     $s = [ $s ].flat(Infinity).filter(
       $ => $ !== null && $ !== undefined
     ).map($ => {
       if ($ instanceof Element || $ === window)
         return $;
       else if (typeof $ == 'string')
-        return doc.qsa($).array();
+        return html.qsa($).array();
       else if ($ instanceof Object) {
         const $parent = $.parent instanceof Element ? $.parent : document;
         if ($.class)
@@ -1318,53 +1500,135 @@ class Events {
         else
           $ = parent.children.array();
       }
-    }).flat(Infinity).filter(
-      $ => $ instanceof Element || $ === window
+    }).flat(Infinity).filter($ =>
+      $ instanceof Element || $ === window
     );
+
     if (!$s.length)
       return [];
 
     try {
-      evs = evs.flat(Infinity).map(
-        ev => Function('evs', `return evs.${ev};`)(this.#evs)
+      events = events.flat(Infinity).map(ev =>
+        Function('events', `return events.${ev};`)(this.#events)
       );
     } catch (er) {
-      evs = undefined;
+      events = undefined;
       console.error(er);
     }
-    if (!evs)
+
+    if (!events)
       return $s.length == 1 ? $s[0] : $s;
 
     let check = true;
     for (let i = 0; i < 100000 && check; i++) {
       check = false;
-      let tempEvs = [];
-      evs.forEach(ev => {
+      let tempEvents = [];
+      events.forEach(ev => {
         if (ev == null || ev == undefined)
           return;
 
         if (ev[0] instanceof Function)
-          tempEvs.push(ev);
+          tempEvents.push(ev);
         else if (ev instanceof Object) { /* Array or Object */
           check = true;
-          tempEvs = tempEvs.concat(ev._vs());
+          tempEvents = tempEvents.concat(ev._vs());
         }
       });
 
-      evs = tempEvs;
+      events = tempEvents;
     }
 
     $s.forEach($ => {
-      evs.forEach(([ fn, options, ev ]) => {
+      events.forEach(([ fn, options, ev ]) => {
         if (fn instanceof Function) {
           switch (ev) {
             case 'disableclick': {
               if ($ instanceof Element)
                 $.setAttr('disableclick', fnObj[0]);
+
+              break;
+            } default: {
+              $.addEventListener(ev, fn, options);
               break;
             };
-            default: {
-              $.addEventListener(ev, fn, options);
+          }
+        }
+      });
+
+      this.#relatedElements.add($);
+    });
+
+    return $s.length == 1 ? $s[0] : $s;
+  }
+  add($s, ...events) {
+    return this.addWithScope($s, ...events, undefined);
+  }
+
+  remove($s, ...events) {
+    $s = [ $s ].flat(Infinity).filter(
+      $ => $ !== null && $ !== undefined
+    ).map($ => {
+      if ($ instanceof Element || $ === window)
+        return $;
+      else if (typeof $ == 'string')
+        return html.qsa($).array();
+      else if ($ instanceof Object) {
+        const $parent = $.parent instanceof Element ? $.parent : document;
+        if ($.class)
+          return $parent.getByClass($.class).array();
+        else if ($.tag)
+          $ = $parent.getByTag($.tag).array();
+        else if ($.id)
+          $ = $parent.getById($.id);
+        else
+          $ = parent.children.array();
+      }
+    }).flat(Infinity).filter($ =>
+      $ instanceof Element || $ === window
+    );
+
+    if (!$s.length)
+      return [];
+
+    try {
+      events = events.flat(Infinity).map(ev =>
+        Function('events', `return events.${ev};`)(this.#events)
+      );
+    } catch (er) {
+      events = undefined;
+      console.error(er);
+    }
+
+    let check = true;
+    for (let i = 0; i < 100000 && check; i++) {
+      check = false;
+      let tempEvents = [];
+      events.forEach(ev => {
+        if (ev == null || ev == undefined)
+          return;
+
+        if (ev[0] instanceof Function)
+          tempEvents.push(ev);
+        else if (ev instanceof Object) { /* Array or Object */
+          check = true;
+          tempEvents = tempEvents.concat(ev._vs());
+        }
+      });
+
+      events = tempEvents;
+    }
+
+    $s.forEach($ => {
+      events.forEach(([ fn, options, ev ]) => {
+        if (fn instanceof Function) {
+          switch (ev) {
+            case 'disableclick': {
+              if ($ instanceof Element)
+                $.rmvAttr('disableclick');
+
+              break;
+            } default: {
+              $.removeEventListener(ev, fn, options);
               break;
             };
           }
@@ -1374,9 +1638,602 @@ class Events {
 
     return $s.length == 1 ? $s[0] : $s;
   }
+  removeEvents(...events) {
+    events = events.flat(Infinity).map(ev =>
+      Function('events', `return events.${ev};`)(this.#events)
+    );
+
+    let check = true;
+    for (let i = 0; i < 100000 && check; i++) {
+      check = false;
+      let tempEvents = [];
+      events.forEach(ev => {
+        if (ev == null || ev == undefined)
+          return;
+
+        if (ev[0] instanceof Function)
+          tempEvents.push(ev);
+        else if (ev instanceof Object) { /* Array or Object */
+          check = true;
+          tempEvents = tempEvents.concat(ev._vs());
+        }
+      });
+
+      events = tempEvents;
+    }
+
+    const relatedElements = this.#relatedElements;
+    relatedElements.forEach($ => {
+      events.forEach(([ fn, options, ev ]) => {
+        if (fn instanceof Function) {
+          switch (ev) {
+            case 'disableclick': {
+              if ($ instanceof Element)
+                $.rmvAttr('disableclick');
+
+              break;
+            } default: {
+              $.removeEventListener(ev, fn, options);
+              break;
+            };
+          }
+        }
+      });
+    });
+
+    return relatedElements;
+  }
+  removeAll(...$s) {
+    $s = $s.flat(Infinity).filter(
+      $ => $ !== null && $ !== undefined
+    ).map($ => {
+      if ($ instanceof Element || $ === window)
+        return $;
+      else if (typeof $ == 'string')
+        return html.qsa($).array();
+      else if ($ instanceof Object) {
+        const $parent = $.parent instanceof Element ? $.parent : document;
+        if ($.class)
+          return $parent.getByClass($.class).array();
+        else if ($.tag)
+          $ = $parent.getByTag($.tag).array();
+        else if ($.id)
+          $ = $parent.getById($.id);
+        else
+          $ = parent.children.array();
+      }
+    }).flat(Infinity).filter($ =>
+      $ instanceof Element || $ === window
+    );
+
+    if (!$s.length)
+      return [];
+
+    const events = this.getFlat;
+    $s.forEach($ => {
+      events.forEach(([ fn, options, ev ]) => {
+        if (fn instanceof Function) {
+          switch (ev) {
+            case 'disableclick': {
+              if ($ instanceof Element)
+                $.rmvAttr('disableclick');
+
+              break;
+            } default: {
+              $.removeEventListener(ev, fn, options);
+              break;
+            };
+          }
+        }
+      });
+
+      this.#relatedElements.delete($);
+    });
+
+
+    return $s.length == 1 ? $s[0] : $s;
+  }
+
+  get get() {
+    return this.#sentEvents;
+  }
+  get getFormatted() {
+    return this.#events;
+  }
+  get getFlat() {
+    return this.#events.v_reduce((arr, v) => arr.concat(v.v_flat()), []);
+  }
+
+  deconstruct() {
+    this.removeAll(...this.#relatedElements);
+
+    this.#events = undefined;
+    this.#sentEvents = undefined;
+
+    this.#relatedElements?.clear?.();
+    this.#relatedElements = undefined;
+
+    DeleteLooseUpdate(this.#memCheckUpdate);
+    this.#memCheckUpdate = undefined;
+  }
 }
 
 class Tooltip {
+  #canceled = false;
+
+  #$tooltip;
+
+  #origin = { x: 'center', y: 'center' };
+  #offset = { x: 0, y: 0 };
+
+  #$anchor;
+  #anchorPoints = { x: 'center', y: 'center' };
+
+  #follow;
+
+  #looseUpdates = [];
+  #fixedUpdates = [];
+  #intervals = [];
+
+  #events = {
+    tooltip: new Events({}),
+    anchor: new Events({}),
+
+    tooltipDeconstructors: new Events({}),
+    anchorDeconstructors: new Events({}),
+  };
+
+  #memoryCheckUpdate = LooseUpdate(function() {
+    if (this.$tooltip?.getAttr?.('memory-removed'))
+      this.deconstruct?.();
+    else if (this.anchor?.getAttr?.('memory-removed'))
+      this.anchor = html;
+  }, 30, this);
+
+  constructor($tooltip = 'div', $anchor, text, addFunc = Element.prototype.appendChild) {
+    this.#$tooltip = $tooltip instanceof Element ? $tooltip : document.createElementByQs($tooltip);
+    this.#$anchor = $anchor instanceof Element ? $anchor : (function() {
+      try {
+        return document.createElementByQs($anchor);
+      } catch (er) {
+        return window;
+      }
+    })();
+
+    this.#$tooltip.style.position = 'fixed';
+    this.#$tooltip.setAttr('tooltip', true);
+    this.#$tooltip.textContent = text;
+
+    (addFunc instanceof Function ? addFunc : Element.prototype.appendChild).call(
+      this.#$anchor instanceof Element ? this.#$anchor : body,
+      this.#$tooltip,
+      this
+    );
+
+    this.update = this.update.bind(this);
+    this.update();
+  }
+  get $tooltip() {
+    return this.#$tooltip;
+  }
+
+  setOrigin(x = this.#origin.x, y = this.#origin.y) {
+    this.#origin = { x, y };
+    return this.update();
+  }
+  setOriginX(x) {
+    return this.setOrigin(x, this.#origin.y);
+  }
+  setOriginY(y) {
+    return this.setOrigin(this.#origin.x, y);
+  }
+  get origin() {
+    return this.#origin;
+  }
+
+  setOffset(x = this.#offset.x, y = this.#offset.y) {
+    this.#offset = { x, y };
+    return this.update();
+  }
+  setOffsetX(x) {
+    return this.setOffset(x, this.#offset.y);
+  }
+  setOffsetY(y) {
+    return this.setOffset(this.#offset.x, y);
+  }
+  get offset() {
+    return this.#offset;
+  }
+
+  anchorTo(x = this.#anchorPoints.x, y = this.#anchorPoints.y, $anchor = this.#$anchor) {
+    if (!($anchor instanceof Window || $anchor instanceof Node))
+      throw new TypeError('The anchor must be a Window or Node.');
+
+    const newAnchor = bool($anchor === this.#$anchor);
+    this.#$anchor = $anchor;
+    this.#anchorPoints = { x, y };
+
+    if (newAnchor)
+      this.setAnchorEvents(this.anchorEvents).setAnchorDeconstructors(this.anchorDeconstructors);
+
+    return this.update();
+  }
+  anchorToX(x) {
+    return this.anchorTo(x, this.#anchorPoints.y);
+  }
+  anchorToY(y) {
+    return this.anchorTo(this.#anchorPoints.x, y);
+  }
+  setAnchor($anchor) {
+    this.anchorTo(...this.#anchorPoints._vs(), $anchor);
+    return $anchor;
+  }
+  set anchor($anchor) {
+    return this.anchor = $anchor;
+  }
+  get anchor() {
+    return this.#$anchor;
+  }
+  get anchorPoints() {
+    return { ...this.#anchorPoints };
+  }
+
+  #updateEvents(type) {
+    switch (type) {
+      case 'tooltip':
+      case 'tooltipDeconstructors': {
+        this.#events[type].addWithScope(this.#$tooltip, 'events', this);
+        break;
+      } case 'anchor':
+      case 'anchorDeconstructors': {
+        this.#events[type].addWithScope(this.#$anchor, 'events', this);
+        break;
+      }
+    }
+
+    return this;
+  }
+  #addEvents(type, events) {
+    const eventsObj = new Events({ events });
+    events = eventsObj.getFormatted.v_$map(v =>
+      v.v_$map(v =>
+        v.map(v => [ v[0].bind(this), v[1], v[2] ])
+      )
+    );
+
+    events = Object.deepMerge(this.#events[type].getFormatted, events);
+    eventsObj.deconstruct();
+
+    this.#events[type].deconstruct();
+    this.#events[type] = new Events(events);
+
+    return this.#updateEvents(type);
+  }
+  #setEvents(type, events) {
+    const eventsObj = new Events({ events });
+    events = eventsObj.getFormatted.v_$map(v =>
+      v.v_$map(v =>
+        v.map(v => [ v[0].bind(this), v[1], v[2] ])
+      )
+    );
+
+    this.#events[type].deconstruct();
+    this.#events[type] = new Events(events);
+
+    eventsObj.deconstruct();
+
+    return this.#updateEvents(type);
+  }
+  #removeEvents(type, ...events) {
+    this.#events[type].removeEvents(...events.map(ev => `events.${ev}`));
+
+    return this.#updateEvents(type);
+  }
+
+  addTooltipEvents(events) {
+    return this.#addEvents('tooltip', events);
+  }
+  setTooltipEvents(events = this.#events.tooltip.get) {
+    return this.#setEvents('tooltip', events);
+  }
+  removeTooltipEvents(...events) {
+    return this.#removeEvents('tooltip', ...events);
+  }
+  get tooltipEvents() {
+    return this.#events.tooltip.getFormatted.events;
+  }
+  get sentTooltipEvents() {
+    return this.#events.tooltip.get.events;
+  }
+
+  addTooltipDeconstructors(events) {
+    return this.#addEvents('tooltipDeconstructors', events);
+  }
+  setTooltipDeconstructors(events = this.#events.tooltipDeconstructors.get) {
+    return this.#setEvents('tooltipDeconstructors', events);
+  }
+  removeTooltipDeconstructors(...events) {
+    return this.#removeEvents('tooltipDeconstructors', ...events);
+  }
+  get tooltipDeconstructors() {
+    return this.#events.tooltipDeconstructors.getFormatted.events;
+  }
+  get sentTooltipDeconstructors() {
+    return this.#events.tooltipDeconstructors.get.events;
+  }
+
+  addAnchorEvents(events) {
+    return this.#addEvents('anchor', events);
+  }
+  setAnchorEvents(events = this.#events.anchor.get) {
+    return this.#setEvents('anchor', events);
+  }
+  removeAnchorEvents(...events) {
+    return this.#removeEvents('anchor', ...events);
+  }
+  get anchorEvents() {
+    return this.#events.anchor.getFormatted.events;
+  }
+  get sentAnchorEvents() {
+    return this.#events.anchor.get.events;
+  }
+
+  addAnchorDeconstructors(events) {
+    return this.#addEvents('anchorDeconstructors', events);
+  }
+  setAnchorDeconstructors(events = this.#events.anchorDeconstructors.get) {
+    return this.#setEvents('anchorDeconstructors', events);
+  }
+  removeAnchorDeconstructors(...events) {
+    return this.#removeEvents('anchorDeconstructors', ...events);
+  }
+  get anchorDeconstructors() {
+    return this.#events.anchorDeconstructors.getFormatted.events;
+  }
+  get sentAnchorDeconstructors() {
+    return this.#events.anchorDeconstructors.get.events;
+  }
+
+  addLooseUpdate(fn, time, scope = this) {
+    const id = LooseUpdate(fn, time, scope);
+    this.#looseUpdates.push(id);
+    return id;
+  }
+  removeLooseUpdate(id) {
+    DeleteLooseUpdate(id);
+    this.#looseUpdates = this.#looseUpdates.filter(i => i != id);
+  }
+  get looseUpdates() {
+    return { ...update.loose }._$filter(([ k ]) => this.#looseUpdates.contains(k))._reduce((obj, [ k, { fn, scope, time } ]) =>
+      (obj[k] = { 'function': fn, scope, time }) && obj,
+    {});
+  }
+
+  addFixedUpdate(fn, time, scope = this) {
+    const id = FixedUpdate(fn, time, scope);
+    this.#fixedUpdates.push(id);
+    return id;
+  }
+  removeFixedUpdate(id) {
+    DeleteFixedUpdate(id);
+    this.#fixedUpdates = this.#fixedUpdates.filter(i => i != id);
+  }
+  get fixedUpdates() {
+    return { ...update.fixed }._$filter(([ k ]) => this.#fixedUpdates.contains(k))._reduce((obj, [ k, { fn, scope, time } ]) =>
+      (obj[k] = { 'function': fn, scope, time }) && obj,
+    {});
+  }
+
+  addInterval(fn, time, scope = this) {
+    const id = setInterval(fn.bind(scope), time);
+    this.#intervals.push({ id: id, fn, scope, time });
+    return id;
+  }
+  removeInterval(id) {
+    clearInterval(id);
+    this.#intervals = this.#intervals.filter(v => v.id != id);
+  }
+  get intervals() {
+    return this.#intervals._reduce((obj, { id, fn, scope, time }) =>
+      (obj[id] = { 'function': fn, scope, time }) && obj,
+    {});
+  }
+
+  update() {
+    if (this.#canceled)
+      return this;
+
+    function getAnchorPoint($anchor, { x, y }) {
+      let parsePoint = function(v, dir) {
+        const [ dir_1, Dir_1, dir_2, Dir_2, dir_scale, Dir_scale ] = dir == 'x' ?
+          [ 'left', 'Left', 'right', 'Right', 'width', 'Width' ] :
+          [ 'top', 'Top', 'bottom', 'Bottom', 'height', 'Height' ];
+
+        if (typeof v == 'string')
+          v = v.replace(new RegExp(`-${dir_scale}`), `-${dir_2}`);
+
+        if ($anchor instanceof Window)
+          switch (v) {
+            case dir_1:
+            case `outer-${dir_1}`:
+            case `inner-${dir_1}`:
+            case `scrollbar-${dir_1}`:
+            case `content-${dir_1}`:
+              return 0;
+            case 'center':
+            case `inner-center`:
+            case `scrollbar-center`:
+            case `content-center`:
+              return window[`inner${Dir_scale}`] / 2;
+            case `outer-center`:
+              return window[`outer${Dir_scale}`] / 2;
+            case dir_2:
+            case `inner-${dir_2}`:
+            case `scrollbar-${dir_2}`:
+            case `content-${dir_2}`:
+              return window[`inner${Dir_scale}`];
+            case `outer-${dir_2}`:
+              return window[`outer${Dir_scale}`];
+            default: {
+              if (typeof v == 'string')
+                return parseCSSPosition(v, window, dir);
+              else if (typeof v == 'number')
+                return v;
+              else if (v instanceof Function)
+                return v.call(window);
+              else
+                throw new TypeError('The anchor point must be a CSS position, number, or function.');
+            }
+          }
+        else if ($anchor instanceof Node) {
+          const center = (v_1, v_2) => (v_1 + v_2) / 2;
+          const rect = $anchor.rect();
+          switch (v) {
+            case dir_1:
+            case `outer-${dir_1}`:
+              return $anchor[`outer${Dir_1}`]();
+            case `inner-${dir_1}`:
+              return $anchor[`inner${Dir_1}`]();
+            case `scrollbar-${dir_1}`:
+              return $anchor[`scrollbar${Dir_1}`]();
+            case `content-${dir_1}`:
+              return $anchor[`content${Dir_1}`]();
+            case 'center':
+            case `outer-center`:
+              return center($anchor[`outer${Dir_1}`](), $anchor[`outer${Dir_2}`]());
+            case `inner-center`:
+              return center($anchor[`inner${Dir_1}`](), $anchor[`inner${Dir_2}`]());
+            case `scrollbar-center`:
+              return rect[dir_1] + (rect[dir_scale] - this[`scrollbar${Dir_scale}`]) / 2;
+            case `content-center`:
+              return center($anchor[`content${Dir_1}`](), $anchor[`content${Dir_2}`]());
+            case dir_2:
+            case `outer-${dir_2}`:
+              return $anchor[`outer${Dir_2}`]();
+            case `inner-${dir_2}`:
+              return $anchor[`inner${Dir_2}`]();
+            case `scrollbar-${dir_2}`:
+              return $anchor[`scrollbar${Dir_2}`]();
+            case `content-${dir_2}`:
+              return $anchor[`content${Dir_2}`]();
+            default: {
+              if (typeof v == 'string')
+                return parseCSSPosition(v, $anchor, dir) - rect[dir_1];
+              else if (typeof v == 'number')
+                return v;
+              else if (v instanceof Function)
+                return v.call($anchor);
+              else
+                throw new TypeError('The anchor point must be a CSS position, number, or function.');
+            }
+          }
+        }
+      };
+
+      const obj = { x: parsePoint(x, 'x'), y: parsePoint(y, 'y') };
+      parsePoint = null;
+
+      return obj;
+    };
+
+    const originPoint = getAnchorPoint(this.#$tooltip, this.#origin);
+    const offsetPoint = getAnchorPoint(html, this.#offset);
+    (offsetPoint.x += this.#$tooltip.rect().x), (offsetPoint.y += this.#$tooltip.rect().y);
+
+    const anchorPoint = getAnchorPoint(this.#$anchor, this.#anchorPoints);
+
+    this.#$tooltip.style.position = 'fixed';
+    this.#$tooltip.style.left = `${anchorPoint.x - originPoint.x + offsetPoint.x}px`;
+    this.#$tooltip.style.top = `${anchorPoint.y - originPoint.y + offsetPoint.y}px`;
+
+    return this;
+  }
+  follow(v) {
+    if (v === undefined)
+      return bool(this.#follow);
+
+    if (v && this.#follow === undefined)
+      this.#follow = FixedUpdate(this.update);
+    else if (!v && this.#follow !== undefined) {
+      DeleteFixedUpdate(this.#follow);
+      this.#follow = undefined;
+    }
+
+
+    return this;
+  }
+
+  deconstruct() {
+    this.#canceled = true;
+
+    this.#origin = undefined;
+
+    this.#$anchor = undefined;
+    this.#anchorPoints = undefined;
+
+    this.#follow = undefined;
+
+    DeleteLooseUpdate(this.#memoryCheckUpdate);
+
+    this.#looseUpdates.forEach(id => DeleteLooseUpdate(id));
+    this.#looseUpdates = undefined;
+    this.#fixedUpdates.forEach(id => DeleteFixedUpdate(id));
+    this.#fixedUpdates = undefined;
+    this.#intervals.forEach(({ id }) => clearInterval(id));
+    this.#intervals = undefined;
+
+    this.#events.tooltip.deconstruct();
+    this.#events.anchor.deconstruct();
+
+    this.#events.tooltipDeconstructors.deconstruct();
+    this.#events.anchorDeconstructors.deconstruct();
+
+    this.#events = undefined;
+
+    this.#$tooltip.memRmv();
+    this.#$tooltip = undefined;
+  }
+  get canceled() {
+    return this.#canceled;
+  }
+}
+
+setTimeout(() => {
+  const $tt = new Tooltip('div.tooltip', body).setOrigin('center', 'center').anchorTo('center', 'center').addAnchorEvents({
+    mouseup: function(ev) {
+      this.follow(true);
+      this.$tooltip.rmvAttr('mousedown');
+    },
+    mousemove: function(ev) {
+      if (this.$tooltip.getAttr('mousedown')) {
+        this.$tooltip.style.left = `${ev.clientX - +this.$tooltip.getAttr('offsetX')}px`;
+        this.$tooltip.style.top = `${ev.clientY - +this.$tooltip.getAttr('offsetY')}px`;
+      }
+    },
+  }).addTooltipEvents({
+    mousedown: [
+      function(ev) {
+        if (ev.button == 1)
+          this.setOrigin(ev.pageX - this.origin.x, ev.pageY - this.origin.y).anchorTo(ev.pageX, ev.pageY) && tt2.update();
+      },
+      function(ev) {
+        this.follow(false);
+        this.$tooltip.setAttr('mousedown', true);
+        this.$tooltip.setAttr('offsetX', ev.offsetX);
+        this.$tooltip.setAttr('offsetY', ev.offsetY);
+      },
+    ],
+  }).follow(true).$tooltip;
+  const tt2 = new Tooltip('div.tooltip', $tt, 'tooltip', $ => body.appendChild($)).setOriginY('top').setOffsetY('1vmin').anchorToY('bottom');
+
+  $tt.style.width = '10vw';
+  $tt.style.height = '10vh';
+  $tt.style.backgroundColor = 'red';
+
+  requestAnimationFrame(tt2.update)
+}, 400);
+
+class TooltipOld {
   #created;
 
   #type;
@@ -1397,7 +2254,7 @@ class Tooltip {
   #update;
   #updateInterval = {};
 
-  #evsCtrl;
+  #eventsCtrl;
 
   /**
    * Creates a new tooltip object.
@@ -1412,7 +2269,17 @@ class Tooltip {
    * @param {string} [id] - The ID of the tooltip element.
    * @param {string|string[]} [classes] - The CSS classes to apply to the tooltip element.
    */
-  constructor(type = 'text', text = 'tooltip', x, y, anchor_x = 'left', anchor_y = 'top', delay = 0, destroyFuncs = { time: { max: 1000 } }, id, classes, update, animate = true) {
+  constructor(
+    type = 'text',
+    text = 'tooltip',
+    x, y,
+    anchor_x = 'left', anchor_y = 'top',
+    delay = 0,
+    destroyFuncs = { time: { max: 1000 } },
+    id, classes,
+    update,
+    animate = true
+  ) {
     this.#created = false;
     this.#type = type;
 
@@ -1540,10 +2407,8 @@ class Tooltip {
   }
   create() {
     const tooltip = this.#tooltip;
-    if (!tooltip || (this.#type == 'help' && global.settings.tips.helpEnabled)) {
-      this.destroy();
-      return;
-    }
+    if (!tooltip || (this.#type == 'help' && global.settings.tips.helpEnabled))
+      return this.destroy();
 
     if (this.#created)
       return;
@@ -1562,13 +2427,12 @@ class Tooltip {
     const thisClass = this;
     const startTime = Date.now();
 
-    const crtl = this.#evsCtrl = new AbortController();
+    const crtl = this.#eventsCtrl = new AbortController();
 
     if (leave instanceof Element)
       leave.addEventListener('mouseleave', () => setTimeout(thisClass.destroy, minTime - (Date.now() - startTime)), { signal: crtl.signal });
     if (out instanceof Element)
       out.addEventListener('mouseout', function(e) {
-        console.log(e.relatedTarget, out.childOf(e.relatedTarget, true))
         if (out.childOf(e.relatedTarget, true))
           setTimeout(thisClass.destroy, minTime - (Date.now() - startTime)), { signal: crtl.signal }
       });
@@ -1597,7 +2461,7 @@ class Tooltip {
   destroy = (animate = true) => {
     const tooltip = this.#tooltip;
     if (!tooltip) {
-      this.#evsCtrl?.abort();
+      this.#eventsCtrl?.abort();
       return;
     }
 
@@ -1620,14 +2484,12 @@ class Tooltip {
     else if (this.#updateInterval.type == 'interval')
       clearInterval(this.#updateInterval.interval);
 
-    this.#evsCtrl?.abort();
+    this.#eventsCtrl?.abort();
   }
   update = e => {
     const tooltip = this.#tooltip;
-    if (!tooltip || (this.#type == 'help' && !global.settings.tips.helpEnabled)) {
-      this.destroy();
-      return;
-    }
+    if (!tooltip || (this.#type == 'help' && !global.settings.tips.helpEnabled))
+      return this.destroy();
 
     const { w, h } = tooltip.rect();
     let x = this.#x ?? e.clientX;
@@ -1663,7 +2525,7 @@ class Tooltip {
     x = x.clamp(0, innerWidth - w);;
     y = y.clamp(0, innerHeight - h);
 
-    tooltip.style.left = `${x}px`;
+    tooltip[`${Dir_1}`] = `${x}px`;
     tooltip.style.top = `${y}px`;
   }
 }
@@ -1675,16 +2537,15 @@ function EvalKeyPath(kPath) {
 
     const path = [];
     while ((match = regex.exec(kPath)) !== null)
-      (function([ v, i ]) {
+      void (function([ v, i ]) {
         const char = { 1: "'", 2: "'", 3: '"', 4: '`' }[i];
-        console.log(v, i, char)
+
         path.push(new Function(`return ${char}${v}${char};`)());
       })(match.map((v, i) => i && bool(v) ? [ v, i ] : null).filter(v => v !== null)[0]);
 
     return path;
   } catch (err) {
-    console.error(err);
-    return;
+    return console.error(err);
   }
 }
 
@@ -1734,7 +2595,7 @@ class VTextFile extends VFile {
   constructor(disk, file) {
     super(disk, file);
 
-    this.#url = URL.createObjectURL(new Blob([ '' ], { type: 'text/plain' })).replace('blob:', '');
+    this.#url = URL.newObjectURL(new Blob([ '' ], { type: 'text/plain' })).replace('blob:', '');
   }
 
   get type() {
@@ -1746,10 +2607,7 @@ class VTextFile extends VFile {
   }
 
   async read() {
-    return await fetch(
-      `blob:${this.#url}`,
-      { cache: 'no-store' }
-    ).then(async function(response) {
+    return await fetch(`blob:${this.#url}`, { cache: 'no-store' }).then(async function(response) {
       let content = '';
 
       const decoder = new TextDecoder();
@@ -1807,9 +2665,9 @@ class VTextFile extends VFile {
   #write = async function(handler) {
     const file = this;
     return await this.readAll().then(function(content) {
-      URL.revokeObjectURL(`blob:${file.#url}`);
+      URL.deleteObjectURL(`blob:${file.#url}`);
 
-      file.#url = URL.createObjectURL(new Blob([
+      file.#url = URL.newObjectURL(new Blob([
         handler.call(file, content).join('\n')
       ], { type: 'text/plain' })).replace('blob:', '');
     });
@@ -1995,7 +2853,7 @@ class VJSONFile extends VFile {
   constructor(disk, file) {
     super(disk, file);
 
-    this.#url = URL.createObjectURL(new Blob([ '' ], { type: 'application/json' })).replace('blob:', '');
+    this.#url = URL.newObjectURL(new Blob([ '' ], { type: 'application/json' })).replace('blob:', '');
   }
 
   get type() {
@@ -2064,8 +2922,8 @@ class VJSONFile extends VFile {
   #write = async function(handler) {
     const file = this;
     return await this.read().then(function(content) {
-      URL.revokeObjectURL(`blob:${file.#url}`);
-      file.#url = URL.createObjectURL(new Blob([
+      URL.deleteObjectURL(`blob:${file.#url}`);
+      file.#url = URL.newObjectURL(new Blob([
         JSON.stringify(handler.call(file, content))
       ], { type: 'application/json' })).replace('blob:', '');
     });
@@ -2093,8 +2951,8 @@ class VJSONFile extends VFile {
   }
 
   async assign(obj) { // rewrite
-    URL.revokeObjectURL(`blob:${this.#url}`);
-    this.#url = URL.createObjectURL(new Blob([
+    URL.deleteObjectURL(`blob:${this.#url}`);
+    this.#url = URL.newObjectURL(new Blob([
       JSON.stringify(Object.assign(await this.read(), obj))
     ], { type: 'application/json' })).replace('blob:', '');
   }
@@ -2124,7 +2982,7 @@ class Disk {
       throw `File ${file} already exists! Overwrite file is set to OFF`;
     else {
       if (this.#files[file])
-        URL.revokeObjectURL(`blob:${this.#files[file].url}`);
+        URL.deleteObjectURL(`blob:${this.#files[file].url}`);
 
       switch ({ txt: 'text/plain', json: 'application/json' }[file.split('.').pop()]) {
         default:
@@ -2143,7 +3001,7 @@ class Disk {
   }
   delete(file) {
     if (this.#files[file]) {
-      URL.revokeObjectURL(`blob:${this.#files[file].url}`);
+      URL.deleteObjectURL(this.#files[file].url);
       delete this.#files[file];
     } else
       throw `File ${file} does not exist!`;

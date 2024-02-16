@@ -59,7 +59,7 @@ LooseUpdate(function(e) {
 
 function Loaded() {
   page.events.add(window, 'window');
-  doc.qsa('[events]').forEach($ => {
+  html.qsa('[events]').forEach($ => {
     const evs = $.getAttr('events');
     if (evs !== null && evs !== undefined)
       page.events.add($, ...evs.split(/\s/));
@@ -276,8 +276,8 @@ async function Paint(e) {
         settings.draw.o[type_i + typeOffset] = { c: ColorArrayToColor(options.c), l: options.l };
 
         const { f: file, t: type, s: strand } = group.d[type_i];
-        if (settings.draw.l[group_i].every(
-          ([ f, t, s ]) => !(f == file && t == type && s == strand))
+        if (settings.draw.l[group_i].every(([ f, t, s ]) =>
+          !(f == file && t == type && s == strand))
         )
           settings.draw.l[group_i].push([ file, type, strand ]);
 
@@ -293,8 +293,8 @@ async function Paint(e) {
             gen = gen();
             let lines;
             while (lines != 'done') {
-              await new Promise(
-                r_gen => gen.next().then(({ value }) => {
+              await new Promise(r_gen =>
+                gen.next().then(({ value }) => {
                   lines = value;
                   r_gen();
                 })
@@ -313,16 +313,10 @@ async function Paint(e) {
                     if (settings.draw.g[group]) {
                       const groupObj = settings.draw.g[group];
                       groupObj.max_h = Math.max(groupObj.max_h, height);
+                    } else
+                      settings.draw.g[group] = { group_i, max_h: height };
 
-                      settings.draw.y[group_i][line] = [ group ];
-                    } else {
-                      settings.draw.g[group] = {
-                        group_i,
-                        max_h: height,
-                      };
-
-                      settings.draw.y[group_i][line] = group;
-                    }
+                    settings.draw.y[group_i][line] = group;
                   }
 
                   hasData = true;
@@ -364,10 +358,10 @@ async function Paint(e) {
     $notif.innerText = `Calibrating Line Positions...`;
     await new Promise(r_wait => requestAnimationFrame(r_wait));
 
-    (function() {
+    void (function() {
       let y = 0;
       const temp = {};
-      settings.draw.y = settings.draw.y.v_forEach(lines =>
+      settings.draw.y.v_forEach(lines =>
         lines._forEach(([ l, h ]) => {
           if (currentRun != global.drawRun)
             throw 'cancel';
@@ -379,13 +373,13 @@ async function Paint(e) {
               break;
             } case 'string': {
               const group = settings.draw.g[h];
-              temp[l] = [ y, h ];
-              group.y = y;
+              if (group.y === undefined) {
+                temp[l] = y;
+                group.y = y;
+                y += group.max_h;
+              } else
+                temp[l] = group.y;
 
-              y += group.max_h;
-              break;
-            } case 'object': {
-              temp[l] = settings.draw.g[h[0]].y;
               break;
             }
           }
@@ -452,7 +446,7 @@ async function Paint(e) {
       if (data._len() == 0)
         continue;
 
-      (function($text, name) {
+      void (function($text, name) {
         $text.style.font = `${settings.text.font.size}px`;
         $text.style.fontFamily = settings.text.font.family;
 
@@ -488,6 +482,8 @@ async function Paint(e) {
 
       y += settings.padding.group.top;
 
+      let wait = [];
+
       const range = settings.draw.r[group_i];
       const chunkLocs = await settings.draw.l[group_i].read();
       await new Promise(r_read => {
@@ -516,24 +512,7 @@ async function Paint(e) {
 
             if (lines != 'done') {
               for (const { line, starts, ends, color } of lines) {
-                {
-                  const group = settings.draw.y[line];
-                  if (typeof group != 'number')
-                    switch (typeof group) {
-                      case 'string': {
-                        settings.draw.y[line] = settings.draw.g[group].y;
-                        break;
-                      } case 'object': {
-                        settings.draw.g[group[1]].y = settings.draw.y[line] + y;
-                        settings.draw.y[line] = group[0];
-                        break;
-                      }
-                    }
-                }
-
                 const dy = (settings.draw.y[line] + y) / h_svg * settings.resolution;
-                console.log(line)
-                delete settings.draw.y[line];
 
                 const drawLine = async function(s, e, option, c) {
                   const dx_1 = (s - min + settings.padding.page.left + settings.padding.group.left) / w_svg * settings.resolution;
@@ -563,13 +542,12 @@ async function Paint(e) {
                   }
                 };
 
-                starts.forEach((s, i) => {
+                wait.push(Promise.all(starts.map((s, i) => {
                   const option = settings.draw.o[data[line]];
                   const e = ends[i];
-                  console.log(s, e, option, color);
 
-                  drawLine(s, e, option, color);
-                });
+                  return drawLine(s, e, option, color);
+                })).then(() => delete settings.draw.y[line]));
               }
 
               lines = null;
@@ -582,6 +560,9 @@ async function Paint(e) {
           r_read();
         }).catch(err => { throw err; });
       }).catch(err => { throw err; });
+
+      await Promise.all(wait);
+      wait = [];
 
       settings.draw.d[group_i].delete();
       delete settings.draw.d[group_i];
@@ -664,12 +645,13 @@ async function Lines(file, type, strand, s, e, lines) {
   };
 
   const multiFiles = file instanceof Array;
-  const check = new RegExp(`[^${lines?.join('')}]( \\S+){1,} (\\S+\\n|\\S+$)`, 'g');
+
+  const dynamic = `[^${lines?.join('')}]`;
+  const check = new RegExp(`(^${dynamic}|\n${dynamic})(.+\n|.+$)`, 'g');
   return async function*() {
     const loopAmnt = multiFiles ? file.length : 1;
     for (let i = 0;i < loopAmnt;i++) {
       const chunks = multiFiles ? GetChunks(...file[i]) : GetChunks(file, type, strand);
-      console.log(chunks)
       for (const { u } of chunks) {
         let obj;
         let fullChunk = '';
@@ -688,9 +670,7 @@ async function Lines(file, type, strand, s, e, lines) {
                 (s <= start && e >= end))
               );
             else
-              obj = fullChunk.replace(check, '').split('\n').map(line => readFLS(line));
-
-            console.log(check, fullChunk, obj)
+              obj = console.log(fullChunk.replace(check, '').split('\n')) || fullChunk.replace(check, '').split('\n').map(line => readFLS(line));
 
             return;
           },
@@ -771,13 +751,13 @@ function CreateKey(anchor, y, h_svg, h, h_text, abbr, intr, { min, max }) {
     $text.setAttr('dominant-baseline', anchor == 'top' ? 'text-top' : 'hanging');
 
     const w_cap = (gap - w) * 2/3;
-    if (label.width(`${h_text / h_svg}px arial`) > w_cap) // try sans-serif
+    if (label.width(`${h_text / h_svg}px arial;`) > w_cap) // try sans-serif
       $text.setAttr('textLength', `${w_cap * 100}%`);
 
     $text.setAttr('fill', 'white'); // make customizable
 
-    $text.innerText = `${label.replace('*', '&times;').replace(/\^.*/,
-      match => `<tspan font-size='${mods.superscript}em' dy='-${mods.superscript * (anchor == 'top' ? 0.5 : 0.125)}em'>${match.slice(1)}</tspan>`
+    $text.innerText = `${label.replace('*', '&times;').replace(/\^.*/,match =>
+      `<tspan font-size='${mods.superscript}em' dy='-${mods.superscript * (anchor == 'top' ? 0.5 : 0.125)}em'>${match.slice(1)}</tspan>`
     )}`;
 
     if (anchor == 'top')
@@ -868,7 +848,7 @@ async function MergeSvgImages(res, r_merge, mergeId = -1) {
 
     $image.onload = () => {
       this.qsa(imageSelector).forEach($ => { // remove images and revoke object urls
-        URL.revokeObjectURL($.getAttr('href'));
+        URL.deleteObjectURL($.getAttr('href'));
         $.memRmv();
       });
 
@@ -935,10 +915,12 @@ function CreateGroup(name) {
  */
 function AddDataToGroup(group_i, file, type, strand) {
   if (file == '*')
-    return global.data._forEach(
-      ([ file, types ]) => types._forEach(
-        ([ type_2, strands ]) => strands._forEach(
-          ([ strand_2 ]) => strand == strand_2 && type_2 == type ? AddDataToGroup(group_i, file, type, strand) : void(0)
+    return global.data._forEach(([ file, types ]) =>
+      types._forEach(([ type_2, strands ]) =>
+        strands._forEach(
+          ([ strand_2 ]) => strand == strand_2 && type_2 == type ?
+            AddDataToGroup(group_i, file, type, strand) :
+            void 0
         )
       )
     );
@@ -1075,7 +1057,7 @@ function AddDataToGroup(group_i, file, type, strand) {
   group.d.push({ $: $data, f: file, t: type, s: strand });
 
   if (global.clipboard?.type == 'line_style' && global.clipboard?.data?._len() && JSON.stringify(group.o.last()) != JSON.stringify(global.clipboard?.data))
-    (function($) {
+    void (function($) {
       $.rmvClass('disabled');
       $.style.transition = 'none';
 

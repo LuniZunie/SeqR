@@ -1480,7 +1480,7 @@ class Events {
    * @param {...string|Array|Object} events - The event(s) to listen for.
    * @returns {Element|Array} - The element(s) with the event listeners added.
    */
-  addWithScope($s, ...events) {
+  addWithScope($s, ...events) { // remove
     const scope = events?.pop();
     $s = [ $s ].flat(Infinity).filter(
       $ => $ !== null && $ !== undefined
@@ -1811,7 +1811,7 @@ class Tooltip {
     );
 
     this.update = this.update.bind(this);
-    this.update();
+    return this;
   }
   get $tooltip() {
     return this.#$tooltip;
@@ -1819,7 +1819,7 @@ class Tooltip {
 
   setOrigin(x = this.#origin.x, y = this.#origin.y) {
     this.#origin = { x, y };
-    return this.update();
+    return this;
   }
   setOriginX(x) {
     return this.setOrigin(x, this.#origin.y);
@@ -1831,41 +1831,94 @@ class Tooltip {
     return this.#origin;
   }
 
-  setOffset(x = this.#offset.x, y = this.#offset.y) {
-    this.#offset = { x, y };
-    return this.update();
+  #offset = class Offset {
+    #offset = { x: 0, y: 0 };
+    #$relativeTo = html;
+
+    #id = -1;
+    #tooltip;
+    constructor(x = 0, y = 0, $relativeTo = html, tooltip) {
+      if (!(tooltip instanceof Tooltip))
+        throw new TypeError('The tooltip must be a Tooltip.');
+      else if (!($relativeTo instanceof Window || $relativeTo instanceof Node))
+        throw new TypeError('The relative element must be a Window or Node.');
+
+      this.#offset = { x, y };
+      this.#$relativeTo = $relativeTo;
+      
+      while (this.#tooltip.getOffset(++this.#id)) continue;
+    }
+
+    setOffset(x = this.#offset.x, y = this.#offset.y, $relativeTo = this.#$relativeTo) {
+      if (!($relativeTo instanceof Window || $relativeTo instanceof Node))
+        throw new TypeError('The relative element must be a Window or Node.');
+
+      this.#$relativeTo = $relativeTo;
+      this.#offset = { x, y };
+
+      return this;
+    }
+    setOffsetX(x = this.#offset.x) {
+      return this.setOffset(x);
+    }
+    setOffsetY(x = this.#offset.y) {
+      return this.setOffset(this.#offset.x, y);
+    }
+    setOffsetElement($relativeTo) {
+      return this.setOffset(this.#offset.x, this.#offset.y, $relativeTo);
+    }
+    get offset() {
+      return { ...this.#offset, relativeTo: this.#$relativeTo }
+    }
+
+    deconstruct(called) {
+      if (!called)
+        this.#tooltip.removeOffset(this.#id);
+
+      this.#offset = undefined;
+      this.#$relativeTo = undefined;
+    }
   }
-  setOffsetX(x) {
-    return this.setOffset(x, this.#offset.y);
+  #offsets = {};
+  requestOffset(x, y, $relativeTo) {
+    return this.newOffset(x, y, $relativeTo) && this;
   }
-  setOffsetY(y) {
-    return this.setOffset(this.#offset.x, y);
+  newOffset(x, y, $relativeTo) {
+    return new this.#offset(x, y, $relativeTo, this);
   }
-  get offset() {
-    return this.#offset;
+  getOffset(id) {
+    return this.#offsets[id];
+  }
+  removeOffset(id) {
+    this.#offset.deconstruct(true);
+    delete this.#offset[id];
+    return this;
+  }
+  get offsets() {
+    return this.#offsets;
   }
 
-  anchorTo(x = this.#anchorPoints.x, y = this.#anchorPoints.y, $anchor = this.#$anchor) {
+  setAnchor(x = this.#anchorPoints.x, y = this.#anchorPoints.y, $anchor = this.#$anchor) {
     if (!($anchor instanceof Window || $anchor instanceof Node))
-      throw new TypeError('The anchor must be a Window or Node.');
+      throw new TypeError('The anchor element must be a Window or Node.');
 
-    const newAnchor = bool($anchor === this.#$anchor);
+    const newAnchor = bool($anchor !== this.#$anchor);
     this.#$anchor = $anchor;
     this.#anchorPoints = { x, y };
 
     if (newAnchor)
       this.setAnchorEvents(this.anchorEvents).setAnchorDeconstructors(this.anchorDeconstructors);
 
-    return this.update();
+    return this;
   }
-  anchorToX(x) {
-    return this.anchorTo(x, this.#anchorPoints.y);
+  setAnchorX(x) {
+    return this.setAnchor(x, this.#anchorPoints.y);
   }
-  anchorToY(y) {
-    return this.anchorTo(this.#anchorPoints.x, y);
+  setAnchorY(y) {
+    return this.setAnchor(this.#anchorPoints.x, y);
   }
-  setAnchor($anchor) {
-    this.anchorTo(...this.#anchorPoints._vs(), $anchor);
+  setAnchorElement($anchor) {
+    this.setAnchor(...this.#anchorPoints._vs(), $anchor);
     return $anchor;
   }
   set anchor($anchor) {
@@ -2118,11 +2171,11 @@ class Tooltip {
               return $anchor[`content${Dir_2}`]();
             default: {
               if (typeof v == 'string')
-                return parseCSSPosition(v, $anchor, dir) - rect[dir_1];
+                return parseCSSPosition(v, $anchor, dir);
               else if (typeof v == 'number')
-                return v;
+                return v + this.rect()[dir_1];
               else if (v instanceof Function)
-                return v.call($anchor);
+                return v.call($anchor) + this.rect()[dir_1];
               else
                 throw new TypeError('The anchor point must be a CSS position, number, or function.');
             }
@@ -2137,9 +2190,12 @@ class Tooltip {
     };
 
     const originPoint = getAnchorPoint(this.#$tooltip, this.#origin);
-    const offsetPoint = getAnchorPoint(html, this.#offset);
-    (offsetPoint.x += this.#$tooltip.rect().x), (offsetPoint.y += this.#$tooltip.rect().y);
-
+    const offsetPoint = this.#offsets.reduce(function(totalOffset, offset) {
+      return {
+        x: totalOffset.x + parsePoint(offset.x, 'x'),
+        y: totalOffset.y + parsePoint(offset.y, 'y'),
+      };
+    }, { x: 0, y: 0 });
     const anchorPoint = getAnchorPoint(this.#$anchor, this.#anchorPoints);
 
     this.#$tooltip.style.position = 'fixed';
@@ -2199,32 +2255,40 @@ class Tooltip {
 }
 
 setTimeout(() => {
-  const $tt = new Tooltip('div.tooltip', body).setOrigin('center', 'center').anchorTo('center', 'center').addAnchorEvents({
-    mouseup: function(ev) {
-      this.follow(true);
-      this.$tooltip.rmvAttr('mousedown');
-    },
-    mousemove: function(ev) {
-      if (this.$tooltip.getAttr('mousedown')) {
-        this.$tooltip.style.left = `${ev.clientX - +this.$tooltip.getAttr('offsetX')}px`;
-        this.$tooltip.style.top = `${ev.clientY - +this.$tooltip.getAttr('offsetY')}px`;
-      }
-    },
-  }).addTooltipEvents({
-    mousedown: [
-      function(ev) {
-        if (ev.button == 1)
-          this.setOrigin(ev.pageX - this.origin.x, ev.pageY - this.origin.y).anchorTo(ev.pageX, ev.pageY) && tt2.update();
+  const $tt = new Tooltip('div.tooltip', body)
+    .setOrigin('center', 'center')
+    .setAnchor('center', 'center')
+    .requestOffset(0, 0, window)
+    .addAnchorEvents({
+      mouseup: function(ev) {
+        this.follow(true);
+        this.$tooltip.rmvAttr('mousedown');
       },
-      function(ev) {
-        this.follow(false);
-        this.$tooltip.setAttr('mousedown', true);
-        this.$tooltip.setAttr('offsetX', ev.offsetX);
-        this.$tooltip.setAttr('offsetY', ev.offsetY);
+      mousemove: function(ev) {
+        if (this.$tooltip.getAttr('mousedown')) {
+          this.$tooltip.style.left = `${ev.clientX - +this.$tooltip.getAttr('offsetX')}px`;
+          this.$tooltip.style.top = `${ev.clientY - +this.$tooltip.getAttr('offsetY')}px`;
+        }
       },
-    ],
-  }).follow(true).$tooltip;
-  const tt2 = new Tooltip('div.tooltip', $tt, 'tooltip', $ => body.appendChild($)).setOriginY('top').setOffsetY('1vmin').anchorToY('bottom');
+    })
+    .addTooltipEvents({
+      mousedown: [
+        function(ev) {
+          if (ev.button == 1)
+            this.getOffset(0).setOffset(ev.pageX - vw(50), ev.clientY - vh(50)) && tt2.update();
+        },
+        function(ev) {
+          this.follow(false);
+          this.$tooltip.setAttr('mousedown', true);
+          this.$tooltip.setAttr('offsetX', ev.offsetX);
+          this.$tooltip.setAttr('offsetY', ev.offsetY);
+        },
+      ],
+    })
+    .follow(true)
+    .$tooltip;
+
+  const tt2 = new Tooltip('div.tooltip', $tt, 'tooltip', $ => body.appendChild($)).setOriginY('top').setOffsetY('1vmin').setAnchorY('bottom');
 
   $tt.style.width = '10vw';
   $tt.style.height = '10vh';

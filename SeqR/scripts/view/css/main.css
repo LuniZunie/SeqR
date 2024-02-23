@@ -278,9 +278,9 @@ body > .file_data_list > .file_data {
   display: inline-block;
 
   position: fixed;
-  max-height: 25vh;
-  left: 50%;
-  top: 50%;
+  max-height: 40vh;
+  left: 50vw;
+  top: 50vh;
 
   padding: 1vmin;
   border-radius: 1vmin;
@@ -292,9 +292,33 @@ body > .file_data_list > .file_data {
 
   background: var(--shade_0-2);
 
-  transform: translate(-50%, -50%);
-
   z-index: 3;
+}
+
+body > .file_data_list > .file_data a {
+  color: var(--link_1);
+
+  transition: all 100ms;
+}
+
+body > .file_data_list > .file_data a:hover {
+  color: var(--link_hover_1);
+}
+
+body > .file_data_list > .file_data a:active:hover {
+  color: var(--link_active_1);
+}
+
+body > .file_data_list > .file_data a:visited {
+  color: var(--visited_link_1);
+}
+
+body > .file_data_list > .file_data a:visited:hover {
+  color: var(--visited_link_hover_1);
+}
+
+body > .file_data_list > .file_data a:visited:active:hover {
+  color: var(--visited_link_active_1);
 }
 
 body > .file_data_list > .file_data > :is(.raw, .process) {
@@ -337,9 +361,11 @@ body > .file_data_list > .file_data > .title {
 }
 
 body > .file_data_list > .file_data > .metadata {
-  display: inline-block;
-  columns: 3;
-  column-gap: 1vmin;
+  --columns: 20;
+
+  display: grid;
+  justify-content: center;
+  grid-template-columns: repeat(var(--columns), 1fr);
 
   max-width: 50vw;
 
@@ -353,14 +379,13 @@ body > .file_data_list > .file_data > .metadata {
 }
 
 body > .file_data_list > .file_data > .metadata > .datum {
-  display: inline-block;
+  display: block;
 
-  width: calc(100% - 2vmin);
+  width: calc(100% - 5vmin);
 
-  margin-top: 0.5vmin;
-  margin-right: 0.5vmin;
-  padding: 1vmin;
-  border-radius: 0.5vmin;
+  margin: 0.5vmin;
+  padding: 2vmin;
+  border-radius: 1vmin;
 
   line-height: 1em;
   white-space: nowrap;
@@ -369,30 +394,8 @@ body > .file_data_list > .file_data > .metadata > .datum {
   background: var(--shade_1-1);
 }
 
-body > .file_data_list > .file_data a {
-  color: var(--link_1);
-
-  transition: all 100ms;
-}
-
-body > .file_data_list > .file_data a:hover {
-  color: var(--link_hover_1);
-}
-
-body > .file_data_list > .file_data a:active:hover {
-  color: var(--link_active_1);
-}
-
-body > .file_data_list > .file_data a:visited {
-  color: var(--visited_link_1);
-}
-
-body > .file_data_list > .file_data a:visited:hover {
-  color: var(--visited_link_hover_1);
-}
-
-body > .file_data_list > .file_data a:visited:active:hover {
-  color: var(--visited_link_active_1);
+body > .file_data_list > .file_data > .metadata > .datum > .value > :is(span, a) {
+  margin-left: 1ch;
 }
 
 body > .top > .draw.button {
@@ -1127,6 +1130,14 @@ body > .side > .content > .groups > .group > .content > :is(.edit, .format, .rem
   background: var(--active_color);
 
   filter: brightness(1.4);
+}
+
+body > .side > .content > .groups > .group > .content > :is(.edit, .format, .remove).button.disabled {
+  pointer-events: none;
+
+  background: transparent;
+
+  filter: brightness(0.1);
 }
 
 body > .side > .content > .groups > .group > .content > :is(.edit, .format, .remove).button > svg {

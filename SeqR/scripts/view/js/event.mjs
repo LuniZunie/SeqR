@@ -16,6 +16,7 @@
 
 /**
  * @typedef { Events } Events
+ * @typedef { Tooltip } Tooltip
 */
 
 import * as globalExports from '../../global/js/global.mjs';
@@ -32,6 +33,8 @@ import * as mainExports from './main.mjs';
 Object.entries(mainExports).forEach(
   ([ name, exported ]) => window[name] = exported
 );
+
+import { default as tips } from '../../global/js/tips.mjs';
 
 page.events = new Events({
   window: {
@@ -183,6 +186,21 @@ page.events = new Events({
     },
   },
   file_picker: {
+    mouseenter: function(e) {
+      new Tooltip('div.tooltip.helptip', body, tips.help.top.import)
+        .setOrigin('center', 'top')
+        .requestAnchor('center', 'bottom', body.qs('body > .top > .import.button'))
+        .requestOffset(0, 5)
+        .newOffset(null, null, this)
+          .setDestructionEvents({
+            'mouseleave': null,
+            'click': null,
+          }, 250)
+          .tooltip
+        .setBoundingBox('left', 'top', 'right', 'bottom')
+        .moveAbove(this)
+        .create(500, 500);
+    },
     click: function(e) {
       this.value = '';
     },
@@ -200,47 +218,122 @@ page.events = new Events({
         $fileData.qs('.process.name').innerText = $.getAttr('process-name');
         $fileData.qs('.process.extension').innerText = $.getAttr('process-extension');
 
-        let maxMetadataWidth = -Infinity;
-        JSON.parse($.getAttr('metadata')).forEach(
-          datum => (function ($datum) {
-            datum.forEach((v, i) => {
-              if (v instanceof Object)
-                switch (v.type) {
-                  case 'link': {
-                    (function($a) {
-                      $a.innerText = v.text ?? v.link;
-                      $a.href = v.link;
-                      $a.target = '_blank';
-                    })($datum.appendChild('a'));
-                    break;
-                  } default:
-                    break;
-                }
-              else
-                $datum.appendChild('span').innerText = v;
+        (function($metadata) {
+          let maxMetadataWidth = -Infinity;
 
-              if (i < datum.length - 1)
-                $datum.appendChild('span').innerText = ' ';
+          const gridColums = +$metadata.getCS('--columns');
+          JSON.parse($.getAttr('metadata')).map(
+            datum => (function ($datum) {
+              (function($label) {
+                $label.innerText = datum.label;
+              })($datum.qs('.label'));
+
+              (function($value) {
+                datum.segments.forEach((v, i) => {
+                  if (v instanceof Object)
+                    switch (v.type) {
+                      case 'link': {
+                        (function($a) {
+                          $a.innerText = v.text ?? v.link;
+                          $a.href = v.link;
+                          $a.target = '_blank';
+                        })($value.appendChild('a'));
+                        break;
+                      } default:
+                        break;
+                    }
+                  else
+                    $value.appendChild('span').innerText = v;
+
+                  if (i < datum.length - 1)
+                    $value.appendChild('span').innerText = ' ';
+                });
+              })($datum.qs('.value'));
+
+              const span = ($datum.scrollWidth / $datum.clientWidth).ceil(2).clamp(1, gridColums);
+              $datum.style.gridColumn = `auto / span ${span}`;
+
+              maxMetadataWidth = Math.max(maxMetadataWidth, $datum.scrollWidth);
+
+              return span;
+            })($metadata.template('.datum', 'append'))
+          ).reduce((rows, span) => {
+            const lastRow = rows.last();
+            if (lastRow.sum() + span > gridColums)
+              rows.push([ span ]);
+            else
+              lastRow.push(span);
+
+            return rows;
+          }, [[]]).reduce((i, row) => {
+            const span = (gridColums - row.sum()) / 2;
+            if (span == 0)
+              return i += row.length;
+
+            $metadata.prependChild('div.centerer', $metadata.qs(`.datum:nth-of-type(${i + 1})`)).setCSS({
+              'grid-column': `auto / span ${span}`,
+              'width': '100%',
             });
 
-            maxMetadataWidth = max(maxMetadataWidth, $datum.scrollWidth);
-          })($fileData.qs('.metadata').template('.datum', 'append'))
-        );
+            i += row.length;
 
-        $fileData.qs('.metadata').style.setProperty('--text-width', `${max(
-          $fileData.qs('.raw.name').scrollWidth + $fileData.qs('.raw.extension').scrollWidth + vmin(0.5),
-          $fileData.qs('.process.name').scrollWidth + $fileData.qs('.process.extension').scrollWidth + vmin(0.5),
-          maxMetadataWidth + vmin(2)
-        )}px`);
+            $metadata.appendChild('div.centerer', $metadata.qs(`.datum:nth-of-type(${i})`)).setCSS({
+              'grid-column': `auto / span ${span}`,
+              'width': '100%',
+            });
+
+            return i;
+          }, 1);
+
+          $metadata.style.setProperty('--text-width', `${Math.max(
+            $fileData.qs('.raw.name').scrollWidth + $fileData.qs('.raw.extension').scrollWidth + vmin(0.5),
+            $fileData.qs('.process.name').scrollWidth + $fileData.qs('.process.extension').scrollWidth + vmin(0.5),
+            maxMetadataWidth + vmin(2)
+          )}px`);
+        })($fileData.qs('.metadata'))
+
+        $fileData.style.left = `${$fileData.rect().x - $fileData.rect().w / 2}px`;
+        $fileData.style.top = `${$fileData.rect().y - $fileData.rect().h / 2}px`;
       })(body.qs('body > .file_data_list').template('.file_data', 'append'));
     },
   },
   delete_data: {
+    mouseenter: function(e) {
+      if (!body.qs('body > .top > .delete_data.button > .confirm').hasClass('hide'))
+        return;
+
+      new Tooltip('div.tooltip.helptip', body, tips.help.top.delete_data)
+        .setOrigin('center', 'top')
+        .newAnchor('center', 'bottom', this)
+          .setDestructionEvents({
+            'mouseleave': null,
+            'click': null,
+          }, 250)
+          .tooltip
+        .requestOffset(0, 5)
+        .setBoundingBox('left', 'top', 'right', 'bottom')
+        .moveAbove(this)
+        .create(500, 500);
+    },
     click: function(e) {
       body.qs('body > .top > .delete_data.button > .confirm').rmvClass('hide');
     },
   },
   delete_data_confirm: {
+    mouseenter: function(e) {
+      new Tooltip('div.tooltip.helptip.confirm_delete_data', body, tips.help.top.confirm_delete_data)
+        .setOrigin('center', 'top')
+        .newAnchor('center', 'bottom', this)
+          .setDestructionEvents({
+            'mouseleave': null,
+            'click': null,
+          }, 250)
+          .tooltip
+        .requestOffset(0, 5)
+        .setBoundingBox('left', 'top', 'right', 'bottom')
+        .moveAbove(this)
+        .create(500, 500);
+    },
     click: function(e) {
       if (global.drawReject)
         global.drawReject('cancel');
@@ -274,17 +367,41 @@ page.events = new Events({
     wheel: function(e) {
       if (this.qsa('.group:not(.template) > .content > .data:not(.template) > .content[over="true"]').some($ => $.clientWidth < $.scrollWidth))
         e.preventDefault();
-    }
+    },
   },
   add_group: {
+    mouseenter: function(e) {
+      new Tooltip('div.tooltip.helptip', body, tips.help.side.bottom.add_group)
+        .setOrigin('center', 'bottom')
+        .newAnchor('center', 'top', this)
+          .setDestructionEvents({
+            'mouseleave': null,
+            'click': null,
+          }, 250)
+          .tooltip
+        .requestOffset(0, -5)
+        .setBoundingBox('left', 'top', 'right', 'bottom')
+        .moveAbove(this)
+        .create(500, 500);
+    },
     click: function(e) {
       CreateGroup();
     },
   },
   auto_group: {
     mouseenter: function(e) {
-      const { x, b, w } = this.rect();
-      new Tooltip('help', global.settings.tips.help.autoGroup, x + w / 2, b + 5, 'center', 'top', 0, { leave: this, time: { min: 100 } }).create();
+      new Tooltip('div.tooltip.helptip', body, tips.help.side.bottom.auto_group)
+        .setOrigin('center', 'bottom')
+        .newAnchor('center', 'top', this)
+          .setDestructionEvents({
+            'mouseleave': null,
+            'click': null,
+          }, 250)
+          .tooltip
+        .requestOffset(0, -5)
+        .setBoundingBox('left', 'top', 'right', 'bottom')
+        .moveAbove(this)
+        .create(500, 500);
     },
     click: function(e, bypass) {
       if ((!global.data?._len() || page.currentAutoGroup == GetAutoGroup()) && !bypass)
@@ -308,8 +425,18 @@ page.events = new Events({
   },
   clean_groups: {
     mouseenter: function(e) {
-      const { x, b, w } = this.rect();
-      new Tooltip('help', global.settings.tips.help.cleanGroups, x + w / 2, b + 5, 'center', 'top', 0, { leave: this, time: { min: 100 } }).create();
+      new Tooltip('div.tooltip.helptip', body, tips.help.side.bottom.clean_groups)
+        .setOrigin('center', 'bottom')
+        .newAnchor('center', 'top', this)
+          .setDestructionEvents({
+            'mouseleave': null,
+            'click': null,
+          }, 250)
+          .tooltip
+        .requestOffset(0, -5)
+        .setBoundingBox('left', 'top', 'right', 'bottom')
+        .moveAbove(this)
+        .create(500, 500);
     },
     click: function(e, bypass) {
       if (!global.groups && !bypass)
@@ -325,6 +452,20 @@ page.events = new Events({
     }
   },
   remove_all_groups: {
+    mouseenter: function(e) {
+      new Tooltip('div.tooltip.helptip', body, tips.help.side.bottom.remove_all_groups)
+        .setOrigin('center', 'bottom')
+        .newAnchor('center', 'top', this)
+          .setDestructionEvents({
+            'mouseleave': null,
+            'click': null,
+          }, 250)
+          .tooltip
+        .requestOffset(0, -5)
+        .setBoundingBox('left', 'top', 'right', 'bottom')
+        .moveAbove(this)
+        .create(500, 500);
+    },
     click: function(e, bypass) {
       if (!global.groups && !bypass)
         return this.addClass('disabled');
@@ -338,8 +479,19 @@ page.events = new Events({
   },
   group_name: {
     mouseenter: function(e) {
-      const { x, y, h } = this.rect();
-      new Tooltip('help', global.settings.tips.help.groupTitle, x - 5, y + h / 2, 'right', 'center', 0, { leave: this, time: { min: 100 } }).create();
+      new Tooltip('div.tooltip.helptip', body, tips.help.side.group.title)
+        .setOrigin('center', 'bottom')
+        .newAnchor('center', 'top', this)
+          .setDestructionEvents({
+            'mouseleave': null,
+            'click': null,
+            'keypress': null,
+          }, 250)
+          .tooltip
+        .requestOffset(0, -5)
+        .setBoundingBox('left', 'top', 'right', 'bottom')
+        .moveAbove(this)
+        .create(500, 500);
     },
     input: function(e) {
       global.groups[this.gen(-2).getAttr('group-index')].n = this.innerHTML;
@@ -347,16 +499,22 @@ page.events = new Events({
   },
   group_edit: {
     mouseenter: function(e) {
-      const { x, y, h } = this.rect();
-      new Tooltip('help', global.settings.tips.help.groupAddData, x - 5, y + h / 2, 'right', 'center', 0, { leave: this, time: { min: 100 } }).create();
+      new Tooltip('div.tooltip.helptip', body, tips.help.side.group.edit)
+        .setOrigin('center', 'bottom')
+        .newAnchor('center', 'top', this)
+          .setDestructionEvents({
+            'mouseleave': null,
+            'click': null,
+          }, 250)
+          .tooltip
+        .requestOffset(0, -5)
+        .setBoundingBox('left', 'top', 'right', 'bottom')
+        .moveAbove(this)
+        .create(500, 500);
     },
     click: function(e) { // holy shit bro this code is cool as fuck - lowkey a lot of fun writing it!
-      if (!global.data._len()) {
-        this.addClass('disabled');
-
-        const { x, b, w } = this.rect();
-        return new Tooltip('error', global.settings.tips.error.groupAddData, x + w / 2, b + 5, 'center', 'top', 0, { time: { min: 2500 } }).create();
-      }
+      if (!global.data._len())
+        return this.addClass('disabled');
 
       const sortByHeight = function($s, $parent, secondaryCompare) {
         const sort = (a, b) => b.rect().h - a.rect().h ||
@@ -416,24 +574,25 @@ page.events = new Events({
 
       LoadEvents(body.qs('body > .data_select > .content'), false);
     },
-    disabledClick: function(e) {
-      const { x, b, w } = this.rect();
-      new Tooltip('error', global.settings.tips.error.groupAddData, x + w / 2, b + 5, 'center', 'top', 0, { time: { min: 2500 } }).create();
-    },
   },
   data_select: {
     wheel: function(e) {
       if (this.qsa('.file.section > .type.section > p.label > span.text[over="true"]').some($ => $.clientWidth < $.scrollWidth))
         e.preventDefault();
-    }
+    },
   },
   data_select_type_label: {
     mouseenter: function(e) {
       this.setAttr('over', true);
     },
-    wheel: function(e) {
-      this.scrollBy(e.deltaY.sgn(20), 0);
-    },
+    wheel: [
+      [
+        function(e) {
+          this.scrollBy(e.deltaY.sgn(20), 0);
+        },
+        { passive: true },
+      ]
+    ],
     mouseleave: function(e) {
       this.setAttr('over', false);
     },
@@ -454,20 +613,34 @@ page.events = new Events({
     }
   },
   group_data: {
-    mouseenter: function(e) {
-      this.setAttr('over', true);
+    mouseenter: [
+      function(e) {
+        new Tooltip('div.tooltip.helptip', body, tips.help.side.group.data.content)
+          .setOrigin('center', 'bottom')
+          .newAnchor('mouse', 'top', this)
+            .setDestructionEvents({
+              'mouseleave': null,
+              'click': null,
+            }, 250)
+            .tooltip
+          .requestOffset(0, -5)
+          .setBoundingBox('left', undefined, 'right', undefined, this)
+          .moveAbove(this)
+          .create(500, 500)
+          .follow(true, 0.1);
+      },
+      function(e) {
+        this.setAttr('over', true);
 
-      const i = (+this.getAttr('over-index') + 1) % 100 || 0;
-      this.setAttr('over-index', i);
+        const i = (+this.getAttr('over-index') + 1) % 100 || 0;
+        this.setAttr('over-index', i);
 
-      setTimeout(() => {
-        if (this.getAttr('over') === 'true' && this.getAttr('over-index') == i)
-          LinePreview(this);
-      }, 250);
-
-      const { x, y, h } = this.rect();
-      new Tooltip('help', global.settings.tips.help.groupData, x - 5, y + h / 2, 'right', 'center', 0, { leave: this, time: { min: 100 } }).create();
-    },
+        setTimeout(() => {
+          if (this.getAttr('over') === 'true' && this.getAttr('over-index') == i)
+            LinePreview(this);
+        }, 250);
+      },
+    ],
     mouseleave: function(e) {
       this.setAttr('over', false);
     },
@@ -483,51 +656,30 @@ page.events = new Events({
 
       body.qs('body > .cover').rmvClass('hide');
     },
-    wheel: function(e) {
-      this.scrollBy(e.deltaY.sgn(20), 0);
-    },
+    wheel: [
+      [
+        function(e) {
+          this.scrollBy(e.deltaY.sgn(20), 0);
+        },
+        { passive: true },
+      ],
+    ],
   },
   group_data_file: {
-    mouseenter: function(e, animate = true) {
-      this.setAttr('over', true);
-
-      const { x, b, w } = this.rect();
-      const x_mx = this.gen(-1).rect().right;
-      if (x + +this.getCS('padding-left').replace(/[^0-9\.e\+-]/g, '') > x_mx)
-        return this.setAttr('animate', true);
-      else
-        this.setAttr('animate', false);
-
-      const text = this.getAttr('file');
-      const center = (x + w / 2 + text.width(this.getCS('font')) / 2 + vmin()) < x_mx;
-
-      const tooltip = new Tooltip('tip',
-        text,
-        center ? x + w / 2 : x_mx,
-        b + 5,
-        center ? 'center' : 'right',
-        'top',
-        100,
-        { leave: this, time: { min: 100 } },
-        undefined,
-        'file_name',
-        undefined,
-        animate
-      );
-
-      page.tooltips.fileNames.push(tooltip);
-      tooltip.create().style.zIndex = 3;
-    },
-    mouseout: function(e) {
-      this.setAttr('over', false);
-    },
-    wheel: function(e) {
-      requestAnimationFrame(() => {
-        const over = this.getAttr('over') === 'true';
-        page.tooltips.fileNames = page.tooltips.fileNames.filter(tooltip => tooltip.destroy(!over));
-        if (over)
-          events.get.group_data_file.mouseenter.call(this, e, this.getAttr('animate') === 'true');
-      });
+    mouseenter: function(e) {
+      new Tooltip('div.tooltip.helptip', body, this.getAttr('file'))
+        .setOrigin('center', 'top')
+        .newAnchor('center', 'bottom', this)
+          .setDestructionEvents({
+            'mouseleave': null,
+            'click': null,
+          }, 250)
+          .tooltip
+        .requestOffset(0, 5)
+        .setBoundingBox('left', 'top', 'right', 'bottom')
+        .moveAbove(this)
+        .create(500, 500)
+        .follow(true, 0.1);
     },
   },
   line_settings: {
@@ -536,10 +688,10 @@ page.events = new Events({
         this.contentWindow.postMessage({
           from: 'view',
           ...global.groups[this.getAttr('group-index')].o.reduce((majority, draw) => {
-            return (
-              count => count > majority.count ? { count, o: draw, counts: majority.counts } : majority
-            )((
-              id => majority.counts[id] = ++majority.counts[id] || 1
+            return (count =>
+              count > majority.count ? { count, o: draw, counts: majority.counts } : majority
+            )((id =>
+              majority.counts[id] = ++majority.counts[id] || 1
             )(JSON.stringify(draw)));
           }, { count: -Infinity, o: { c: PrandomColorArray(), l: { h: 1, b: 0, l: 0, r: 0 } }, counts: {} }).o,
           bg: global.draw.bg,
@@ -565,8 +717,18 @@ page.events = new Events({
   },
   group_data_copy: {
     mouseenter: function(e) {
-      const { x, y, w } = this.rect();
-      new Tooltip('help', global.settings.tips.help.groupDataCopy, x + w / 2, y - 5, 'center', 'bottom', 0, { leave: this, time: { min: 100 } }).create();
+      new Tooltip('div.tooltip.helptip', body, tips.help.side.group.data.copy)
+        .setOrigin('center', 'bottom')
+        .newAnchor('center', 'top', this)
+          .setDestructionEvents({
+            'mouseleave': null,
+            'click': null,
+          }, 250)
+          .tooltip
+        .requestOffset(0, -5)
+        .setBoundingBox('left', 'top', 'right', 'bottom')
+        .moveAbove(this)
+        .create(500, 500);
     },
     click: function(e) {
       const i_group = +this.gen(-3).getAttr('group-index');
@@ -587,8 +749,18 @@ page.events = new Events({
   },
   group_data_paste: {
     mouseenter: function(e) {
-      const { x, y, w } = this.rect();
-      new Tooltip('help', global.settings.tips.help.groupDataPaste, x + w / 2, y - 5, 'center', 'bottom', 0, { leave: this, time: { min: 100 } }).create();
+      new Tooltip('div.tooltip.helptip', body, tips.help.side.group.data.paste)
+        .setOrigin('center', 'bottom')
+        .newAnchor('center', 'top', this)
+          .setDestructionEvents({
+            'mouseleave': null,
+            'click': null,
+          }, 250)
+          .tooltip
+        .requestOffset(0, -5)
+        .setBoundingBox('left', 'top', 'right', 'bottom')
+        .moveAbove(this)
+        .create(500, 500);
     },
     click: function(e) {
       const i_group = +this.gen(-3).getAttr('group-index');
@@ -609,8 +781,18 @@ page.events = new Events({
   },
   group_format: {
     mouseenter: function(e) {
-      const { x, y, w } = this.rect();
-      new Tooltip('tip', global.settings.tips.help.groupFormat, x + w / 2, y - 5, 'center', 'bottom', 0, { leave: this, time: { min: 100 } }).create();
+      new Tooltip('div.tooltip.helptip', body, tips.help.side.group.format)
+        .setOrigin('center', 'bottom')
+        .newAnchor('center', 'top', this)
+          .setDestructionEvents({
+            'mouseleave': null,
+            'click': null,
+          }, 250)
+          .tooltip
+        .requestOffset(0, -5)
+        .setBoundingBox('left', 'top', 'right', 'bottom')
+        .moveAbove(this)
+        .create(500, 500);
     },
     click: function(e) {
       const $lineSettings = body.qs('body > iframe.line_settings');
@@ -626,8 +808,18 @@ page.events = new Events({
   },
   group_remove: {
     mouseenter: function(e) {
-      const { x, y, w } = this.rect();
-      new Tooltip('help', global.settings.tips.help.groupRemove, x + w / 2, y - 5, 'center', 'bottom', 0, { leave: this, time: { min: 100 } }).create();
+      new Tooltip('div.tooltip.helptip', body, tips.help.side.group.remove)
+        .setOrigin('center', 'bottom')
+        .newAnchor('center', 'top', this)
+          .setDestructionEvents({
+            'mouseleave': null,
+            'click': null,
+          }, 250)
+          .tooltip
+        .requestOffset(0, -5)
+        .setBoundingBox('left', 'top', 'right', 'bottom')
+        .moveAbove(this)
+        .create(500, 500);
     },
     click: function(e) {
       const { $ } = global.groups.splice(this.gen(-2).getAttr('group-index'), 1)[0];
@@ -638,6 +830,20 @@ page.events = new Events({
     },
   },
   draw: {
+    mouseenter: function(e) {
+      new Tooltip('div.tooltip.helptip', body, tips.help.side.draw)
+        .setOrigin('center', 'top')
+        .newAnchor('center', 'bottom', this)
+          .setDestructionEvents({
+            'mouseleave': null,
+            'click': null,
+          }, 250)
+          .tooltip
+        .requestOffset(0, 5)
+        .setBoundingBox('left', 'top', 'right', 'bottom')
+        .moveAbove(this)
+        .create(500, 500);
+    },
     click: function(e) {
       if (this.hasClass('cancel')) {
         if (global.drawReject)
@@ -889,6 +1095,20 @@ page.events = new Events({
     },
   },
   export: {
+    mouseenter: function(e) {
+      new Tooltip('div.tooltip.helptip', body, tips.help.side.export)
+        .setOrigin('center', 'top')
+        .newAnchor('center', 'bottom', this)
+          .setDestructionEvents({
+            'mouseleave': null,
+            'click': null,
+          }, 250)
+          .tooltip
+        .requestOffset(0, 5)
+        .setBoundingBox('left', 'top', 'right', 'bottom')
+        .moveAbove(this)
+        .create(500, 500);
+    },
     click: function(e) {
       /* if (!body.qs('body > .content > .easel > svg.paper:not(.template)'))
         return this.addClass('disabled'); */
@@ -947,15 +1167,22 @@ page.events = new Events({
   },
   export_name_sub_text: {
     mouseenter: function(e) {
-      const { x, b, w } = this.rect();
-      const $tooltip = new Tooltip('tooltip', this.innerHTML, x + w / 2, b + 5, 'center', 'top', 300, { leave: this, time: { min: 100 } }).create();
-
-      $tooltip.style.color = '#ccd';
-      $tooltip.style.fontSize = '1.25em';
-
-      $tooltip.style.background = getComputedStyle(this.gen(-Infinity, 0, true).flat(Infinity).reverse().find(
-        $ => $ instanceof Element && getComputedStyle($).backgroundColor != 'rgba(0, 0, 0, 0)'
-      )).backgroundColor;
+      new Tooltip('div.tooltip.helptip', body, this.innerHTML)
+        .setOrigin('center', 'top')
+        .newAnchor('center', 'bottom', this)
+          .setDestructionEvents({
+            'mouseleave': null,
+          }, 250)
+          .tooltip
+        .requestOffset(0, 5)
+        .setBoundingBox('left', 'top', 'right', 'bottom')
+        .moveAbove(this)
+        .addCSS({
+          color: this.getParsedCS('color'),
+          'font-size': '1.25em',
+          background: this.getParsedCS('background-color', 'rgba(0, 0, 0, 0)'),
+        })
+        .create(500, 500);
     },
   },
 });

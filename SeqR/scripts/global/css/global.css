@@ -482,29 +482,17 @@ notification.error {
   z-index: 3;
 }
 
-tooltip {
+.helptip {
   pointer-events: none;
 
-  display: block;
-
-  position: fixed;
-
-  color: #aaa;
+  color: var(--text_3);
   text-align: center;
   overflow: auto;
 
-  padding: 0.5vmin 1vmin;
+  padding: 0.5vmin;
+  border: 2px solid var(--shade_3-0);
 
-  border: 2px solid #111;
-  border-radius: 0.5vmin;
-
-  opacity: 0;
-  background: #000;
-}
-
-tooltip > * {
-  margin: 0;
-  padding: 0;
+  background: var(--shade_1-0);
 }
 
 .template {

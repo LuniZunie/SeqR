@@ -86,8 +86,7 @@ const update = {
 };
 
 const global = {
-  mouse_x: 0,
-  mouse_y: 0,
+  mouse: {},
   lineStyles: {
     bodies: {
       'solid': 'solid',
@@ -158,20 +157,6 @@ const global = {
     readerCacheMin: 500000,
     tips: {
       helpEnabled: true,
-      help: {
-        autoGroup: '<span style="font-size: 18px;">Automatically add every strand type sorted into their respective types</span>',
-        cleanGroups: '<span style="font-size: 18px">Automatically remove all duplicate and empty groups.<span style="font-size: 16px"><br><br>Group names and line styles are <b style="color: #c83333;">NOT</b> accounted for when checking duplicates!</span></span>',
-        groupTitle: 'Rename group',
-        groupFormat: 'Group line options',
-        groupRemove: 'Remove group',
-        groupAddData: 'Add data',
-        groupData: 'Line options',
-        groupDataCopy: 'Copy style',
-        groupDataPaste: 'Paste style',
-      },
-      error: {
-        groupAddData: '<span style="font-size: 20px;color: red">Please load a file before adding data!</span>',
-      },
     },
   },
   draw: {
@@ -515,10 +500,7 @@ Object.defineProperty(global.extensions.gff, 'evalEscChars', {
   },
 });
 
-addEventListener('mousemove', e => {
-  global.mouse_x = e.pageX;
-  global.mouse_y = e.pageY;
-});
+addEventListener('mousemove', e => global.mouse = e);
 
 function min(...paras) {
   return Math.min(...paras);
@@ -1339,12 +1321,12 @@ FixedUpdate(function() {
     if ($.preDecAttr('scroll-wait-ticks') > 0 || $.scrollWidth <= $.clientWidth || document.activeElement == $) //prefix because it's decremented before the check
       return;
 
-    let l = $[`${Dir_1}`];
+    let l = $.scrollLeft;
     const speed = +$.nullSetAttr('scroll-speed', 1) + +$.nullSetAttr('scroll-round', 0);
     $.setAttr('scroll-round', speed % 1);
 
     $.scrollBy(+$.nullSetAttr('scroll-direction', 1) * speed | 0, 0);
-    if (l == $[`${Dir_1}`]) {
+    if (l == $.scrollLeft) {
       $.setAttr('scroll-direction', -$.getAttr('scroll-direction'));
       $.setAttr('scroll-wait-ticks', $.nullSetAttr('scroll-wait', 1) * 30);
     }
@@ -1403,7 +1385,7 @@ class Events {
         this.#relatedElements.delete($);
     });
   }, 30, this);
-  constructor(events) {
+  constructor(events = {}) {
     this.#sentEvents = events;
 
     let check = true;
@@ -1758,199 +1740,356 @@ class Events {
   }
 }
 
-class Tooltip {
-  #canceled = false;
+class Modifier {
+  #id = -1;
+  #tooltip;
+  #type;
 
-  #$tooltip;
+  #point = { x: 0, y: 0 };
+  #$element;
 
-  #origin = { x: 'center', y: 'center' };
-  #offset = { x: 0, y: 0 };
+  #boundingBox = {
+    x1: -Infinity,
+    y1: -Infinity,
+    x2: Infinity,
+    y2: Infinity,
+  };
+  #$boundingBoxAnchor = window;
 
-  #$anchor;
-  #anchorPoints = { x: 'center', y: 'center' };
+  #events = {
+    standard: new Events(),
+    destruction: new Events(),
+  };
 
-  #follow;
+  #mouse;
+  #mouseEvent = e => this.#mouse = e;
 
   #looseUpdates = [];
   #fixedUpdates = [];
   #intervals = [];
 
-  #events = {
-    tooltip: new Events({}),
-    anchor: new Events({}),
-
-    tooltipDeconstructors: new Events({}),
-    anchorDeconstructors: new Events({}),
-  };
-
   #memoryCheckUpdate = LooseUpdate(function() {
-    if (this.$tooltip?.getAttr?.('memory-removed'))
+    if (this.element?.getAttr?.('memory-removed'))
       this.deconstruct?.();
-    else if (this.anchor?.getAttr?.('memory-removed'))
+    if (this.anchor?.getAttr?.('memory-removed'))
       this.anchor = html;
+    if (this.boundingBoxAnchor?.getAttr?.('memory-removed'))
+      this.boundingBoxAnchor = window;
   }, 30, this);
 
-  constructor($tooltip = 'div', $anchor, text, addFunc = Element.prototype.appendChild) {
-    this.#$tooltip = $tooltip instanceof Element ? $tooltip : document.createElementByQs($tooltip);
-    this.#$anchor = $anchor instanceof Element ? $anchor : (function() {
-      try {
-        return document.createElementByQs($anchor);
-      } catch (er) {
-        return window;
+  #getAnchorPoint = function($anchor, { x, y }, tooltip) {
+    let parsePoint = function(v, dir) {
+      const [ Dir, dir_1, Dir_1, dir_2, Dir_2, dir_scale, Dir_scale ] = dir == 'x' ?
+        [ 'X', 'left', 'Left', 'right', 'Right', 'width', 'Width' ] :
+        [ 'Y', 'top', 'Top', 'bottom', 'Bottom', 'height', 'Height' ];
+
+      if (typeof v == 'string')
+        v = v.replace(new RegExp(`-${dir_scale}`), `-${dir_2}`);
+
+      if ($anchor instanceof Window)
+        switch (v) {
+          case 'mouse':
+          case 'page-mouse':
+            return this.mouse[`page${Dir}`];
+          case 'client-mouse':
+            return this.mouse[`client${Dir}`];
+          case 'offset-mouse':
+            return this.mouse[`offset${Dir}`];
+          case 'screen-mouse':
+            return this.mouse[`screen${Dir}`];
+          case 'global-mouse':
+          case 'global-page-mouse':
+            return global.mouse[`page${Dir}`];
+          case 'global-client-mouse':
+            return global.mouse[`client${Dir}`];
+          case 'global-offset-mouse':
+            return global.mouse[`offset${Dir}`];
+          case 'global-screen-mouse':
+            return global.mouse[`screen${Dir}`];
+          case dir_1:
+          case `outer-${dir_1}`:
+          case `inner-${dir_1}`:
+          case `scrollbar-${dir_1}`:
+          case `content-${dir_1}`:
+            return 0;
+          case 'center':
+          case `inner-center`:
+          case `scrollbar-center`:
+          case `content-center`:
+            return window[`inner${Dir_scale}`] / 2;
+          case `outer-center`:
+            return window[`outer${Dir_scale}`] / 2;
+          case dir_2:
+          case `inner-${dir_2}`:
+          case `scrollbar-${dir_2}`:
+          case `content-${dir_2}`:
+            return window[`inner${Dir_scale}`];
+          case `outer-${dir_2}`:
+            return window[`outer${Dir_scale}`];
+          case null:
+            return 0;
+          default: {
+            if (typeof v == 'string')
+              return parseCSSPosition(v, window, dir);
+            else if (typeof v == 'number')
+              return v;
+            else if (v instanceof Function)
+              return v.call(this, this);
+            else
+              throw new TypeError('The anchor point must be a CSS position, number, or function. Passed: ' + v);
+          }
+        }
+      else if ($anchor instanceof Node) {
+        const center = (v_1, v_2) => (v_1 + v_2) / 2;
+        const rect = $anchor.rect();
+        const offset = tooltip ? -$anchor.rect()[dir] : 0;
+
+        switch (v) {
+          case 'mouse':
+          case 'page-mouse':
+            return this.mouse[`page${Dir}`];
+          case 'client-mouse':
+            return this.mouse[`client${Dir}`];
+          case 'offset-mouse':
+            return this.mouse[`offset${Dir}`];
+          case 'screen-mouse':
+            return this.mouse[`screen${Dir}`];
+          case 'global-mouse':
+          case 'global-page-mouse':
+            return global.mouse[`page${Dir}`];
+          case 'global-client-mouse':
+            return global.mouse[`client${Dir}`];
+          case 'global-offset-mouse':
+            return global.mouse[`offset${Dir}`];
+          case 'global-screen-mouse':
+            return global.mouse[`screen${Dir}`];
+          case dir_1:
+          case `outer-${dir_1}`:
+            return $anchor[`outer${Dir_1}`]() + offset;
+          case `inner-${dir_1}`:
+            return $anchor[`inner${Dir_1}`]() + offset;
+          case `scrollbar-${dir_1}`:
+            return $anchor[`scrollbar${Dir_1}`]() + offset;
+          case `content-${dir_1}`:
+            return $anchor[`content${Dir_1}`]() + offset;
+          case 'center':
+          case `outer-center`:
+            return center($anchor[`outer${Dir_1}`](), $anchor[`outer${Dir_2}`]()) + offset;
+          case `inner-center`:
+            return center($anchor[`inner${Dir_1}`](), $anchor[`inner${Dir_2}`]()) + offset;
+          case `scrollbar-center`:
+            return rect[dir_1] + (rect[dir_scale] - $anchor[`scrollbar${Dir_scale}`]) / 2 + offset;
+          case `content-center`:
+            return center($anchor[`content${Dir_1}`](), $anchor[`content${Dir_2}`]()) + offset;
+          case dir_2:
+          case `outer-${dir_2}`:
+            return $anchor[`outer${Dir_2}`]() + offset;
+          case `inner-${dir_2}`:
+            return $anchor[`inner${Dir_2}`]() + offset;
+          case `scrollbar-${dir_2}`:
+            return $anchor[`scrollbar${Dir_2}`]() + offset;
+          case `content-${dir_2}`:
+            return $anchor[`content${Dir_2}`]() + offset;
+          case null:
+            return 0;
+          default: {
+            if (typeof v == 'string')
+              return parseCSSPosition(v, $anchor, dir) + offset;
+            else if (typeof v == 'number')
+              return v;
+            else if (v instanceof Function)
+              return v.call(this, this);
+            else
+              throw new TypeError('The anchor point must be a CSS position, number, or function. Passed: ' + v);
+          }
+        }
       }
-    })();
+    };
 
-    this.#$tooltip.style.position = 'fixed';
-    this.#$tooltip.setAttr('tooltip', true);
-    this.#$tooltip.textContent = text;
+    const obj = { x: parsePoint.call(this, x, 'x'), y: parsePoint.call(this, y, 'y') };
+    parsePoint = null;
 
-    (addFunc instanceof Function ? addFunc : Element.prototype.appendChild).call(
-      this.#$anchor instanceof Element ? this.#$anchor : body,
-      this.#$tooltip,
-      this
-    );
+    return obj;
+  };
+  constructor(x = 'center', y = 'center', $element = window, events = {}, deconstructionEvents = {}, tooltip, type = 'Anchor') {
+    if ($element === 'tooltip')
+      $element = tooltip.element;
 
-    this.update = this.update.bind(this);
+    if (!($element instanceof Window || $element instanceof Node))
+      throw new TypeError('The relative element must be a Window or Node.');
+    else if (!(tooltip instanceof Tooltip) && type != 'Tooltip')
+      throw new TypeError('The tooltip must be a Tooltip.');
+    else if (!(type == 'Tooltip' || type == 'Anchor' || type == 'Offset'))
+      throw new TypeError('The type must be "Tooltip" or "Anchor" or "Offset".');
+
+    if (type != 'Tooltip')
+      while (tooltip[`get${type}`](++this.#id)) continue;
+
+    this.#tooltip = tooltip;
+    this.#type = type;
+
+    this.#$element = $element;
+    this.setPoint(x, y);
+
+    this.#setEvents('standard', events);
+    this.#setEvents('destruction', deconstructionEvents);
+  }
+  get id() {
+    if (this.#id == -1)
+      throw new Error('The modifier has already been deconstructed.');
+
+    return this.#id;
+  }
+  get tooltip() {
+    if (this.#id == -1)
+      throw new Error('The modifier has already been deconstructed.');
+
+    return this.#tooltip;
+  }
+  get tooltipElement() {
+    if (this.#id == -1)
+      throw new Error('The modifier has already been deconstructed.');
+
+    return this.#tooltip.element;
+  }
+  get type() {
+    return this.#type;
+  }
+  get mouse() {
+    return this.#mouse;
+  }
+
+  setPoint(x = this.#point.x, y = this.#point.y) {
+    const regex = new RegExp('(?<!global-)mouse');
+    const includesMouse = regex.exec(x?.toString()) || regex.exec(y?.toString());
+    if (includesMouse && !this.#mouse) {
+      this.#mouseEvent = (e => this.#mouse = e).bind(this);
+      this.#$element.addEventListener('mousemove', this.#mouseEvent);
+
+      this.#mouse = global.mouse;
+    } else if (!includesMouse && this.#mouse) {
+      this.#$element.removeEventListener('mousemove', this.#mouseEvent);
+      this.#mouse = undefined;
+    }
+
+    this.#point = { x, y };
     return this;
   }
-  get $tooltip() {
-    return this.#$tooltip;
+  get point() {
+    return this.#point;
+  }
+  get parsedPoint() {
+    return this.#getAnchorPoint(this.#$element, this.#point, this.#type == 'Tooltip');
   }
 
-  setOrigin(x = this.#origin.x, y = this.#origin.y) {
-    this.#origin = { x, y };
+  setX(x) {
+    return this.setPoint(x);
+  }
+  get x() {
+    return this.#point.x;
+  }
+  get parsedX() {
+    return this.parsedAnchor.x;
+  }
+
+  setY(y) {
+    return this.setPoint(undefined, y);
+  }
+  get y() {
+    return this.#point.y;
+  }
+  get parsedY() {
+    return this.parsedAnchor.y;
+  }
+
+  setElement($element) {
+    if (this.#id == -1)
+      throw new Error('The modifier has already been deconstructed.');
+
+    if (!($element instanceof Window || $element instanceof Node))
+      throw new TypeError('The relative element must be a Window or Node.');
+
+    if (this.#mouse) {
+      this.#$element.removeEventListener('mousemove', this.#mouseEvent);
+
+      this.#mouseEvent = (e => this.#mouse = e).bind(this);
+      $element.addEventListener('mousemove', this.#mouseEvent);
+    }
+
+    this.#$element = $element;
     return this;
   }
-  setOriginX(x) {
-    return this.setOrigin(x, this.#origin.y);
-  }
-  setOriginY(y) {
-    return this.setOrigin(this.#origin.x, y);
-  }
-  get origin() {
-    return this.#origin;
+  get element() {
+    return this.#$element;
   }
 
-  #offset = class Offset {
-    #offset = { x: 0, y: 0 };
-    #$relativeTo = html;
+  setBoundingBox(
+    x1 = this.#boundingBox.x1,
+    y1 = this.#boundingBox.y1,
+    x2 = this.#boundingBox.x2,
+    y2 = this.#boundingBox.y2,
+    $element = this.#$boundingBoxAnchor ?? window
+  ) {
+    if (this.#type != 'Tooltip')
+      throw new Error('The bounding box can only be set for a Tooltip.');
 
-    #id = -1;
-    #tooltip;
-    constructor(x = 0, y = 0, $relativeTo = html, tooltip) {
-      if (!(tooltip instanceof Tooltip))
-        throw new TypeError('The tooltip must be a Tooltip.');
-      else if (!($relativeTo instanceof Window || $relativeTo instanceof Node))
-        throw new TypeError('The relative element must be a Window or Node.');
-
-      this.#offset = { x, y };
-      this.#$relativeTo = $relativeTo;
-      
-      while (this.#tooltip.getOffset(++this.#id)) continue;
-    }
-
-    setOffset(x = this.#offset.x, y = this.#offset.y, $relativeTo = this.#$relativeTo) {
-      if (!($relativeTo instanceof Window || $relativeTo instanceof Node))
-        throw new TypeError('The relative element must be a Window or Node.');
-
-      this.#$relativeTo = $relativeTo;
-      this.#offset = { x, y };
-
-      return this;
-    }
-    setOffsetX(x = this.#offset.x) {
-      return this.setOffset(x);
-    }
-    setOffsetY(x = this.#offset.y) {
-      return this.setOffset(this.#offset.x, y);
-    }
-    setOffsetElement($relativeTo) {
-      return this.setOffset(this.#offset.x, this.#offset.y, $relativeTo);
-    }
-    get offset() {
-      return { ...this.#offset, relativeTo: this.#$relativeTo }
-    }
-
-    deconstruct(called) {
-      if (!called)
-        this.#tooltip.removeOffset(this.#id);
-
-      this.#offset = undefined;
-      this.#$relativeTo = undefined;
-    }
-  }
-  #offsets = {};
-  requestOffset(x, y, $relativeTo) {
-    return this.newOffset(x, y, $relativeTo) && this;
-  }
-  newOffset(x, y, $relativeTo) {
-    return new this.#offset(x, y, $relativeTo, this);
-  }
-  getOffset(id) {
-    return this.#offsets[id];
-  }
-  removeOffset(id) {
-    this.#offset.deconstruct(true);
-    delete this.#offset[id];
-    return this;
-  }
-  get offsets() {
-    return this.#offsets;
-  }
-
-  setAnchor(x = this.#anchorPoints.x, y = this.#anchorPoints.y, $anchor = this.#$anchor) {
-    if (!($anchor instanceof Window || $anchor instanceof Node))
-      throw new TypeError('The anchor element must be a Window or Node.');
-
-    const newAnchor = bool($anchor !== this.#$anchor);
-    this.#$anchor = $anchor;
-    this.#anchorPoints = { x, y };
-
-    if (newAnchor)
-      this.setAnchorEvents(this.anchorEvents).setAnchorDeconstructors(this.anchorDeconstructors);
+    this.setBoundingBoxElement($element);
+    this.#boundingBox = { x1, y1, x2, y2 };
 
     return this;
   }
-  setAnchorX(x) {
-    return this.setAnchor(x, this.#anchorPoints.y);
+  get boundingBox() {
+    if (this.#type != 'Tooltip')
+      throw new Error('The bounding box can only be gotten for a Tooltip.');
+
+    return { element: this.#$boundingBoxAnchor, ...this.#boundingBox };
   }
-  setAnchorY(y) {
-    return this.setAnchor(this.#anchorPoints.x, y);
+  get parsedBoundingBox() {
+    if (this.#type != 'Tooltip')
+      throw new Error('The bounding box can only be gotten for a Tooltip.');
+
+    const { x: x1, y: y1 } = this.#getAnchorPoint(this.#$boundingBoxAnchor, { x: this.#boundingBox.x1, y: this.#boundingBox.y1 });
+    const { x: x2, y: y2 } = this.#getAnchorPoint(this.#$boundingBoxAnchor, { x: this.#boundingBox.x2, y: this.#boundingBox.y2 });
+
+    return { element: this.#$boundingBoxAnchor, x1, y1, x2, y2 };
   }
-  setAnchorElement($anchor) {
-    this.setAnchor(...this.#anchorPoints._vs(), $anchor);
-    return $anchor;
+
+  setBoundingBoxElement($element) {
+    if (this.#type != 'Tooltip')
+      throw new Error('The bounding box can only be set for a Tooltip.');
+
+    if ($element === 'tooltip')
+      $element = this.tooltip.element;
+    else if (!($element instanceof Window || $element instanceof Node))
+      throw new TypeError('The relative element must be a Window or Node.');
+
+    this.#$boundingBoxAnchor = $element;
+    return this;
   }
-  set anchor($anchor) {
-    return this.anchor = $anchor;
-  }
-  get anchor() {
-    return this.#$anchor;
-  }
-  get anchorPoints() {
-    return { ...this.#anchorPoints };
+  get boundingBoxElement() {
+    if (this.#type != 'Tooltip')
+      throw new Error('The bounding box can only be gotten for a Tooltip.');
+
+    return this.#$boundingBoxAnchor;
   }
 
   #updateEvents(type) {
-    switch (type) {
-      case 'tooltip':
-      case 'tooltipDeconstructors': {
-        this.#events[type].addWithScope(this.#$tooltip, 'events', this);
-        break;
-      } case 'anchor':
-      case 'anchorDeconstructors': {
-        this.#events[type].addWithScope(this.#$anchor, 'events', this);
-        break;
-      }
-    }
-
+    this.#events[type].add(this.#$element, 'events');
     return this;
   }
-  #addEvents(type, events) {
+  #addEvents(type, events, misc) {
     const eventsObj = new Events({ events });
     events = eventsObj.getFormatted.v_$map(v =>
       v.v_$map(v =>
-        v.map(v => [ v[0].bind(this), v[1], v[2] ])
+        v.map(v => {
+          if (type == 'destruction')
+            v[0] = new Function('func', `
+              this.tooltip.deconstruct(${misc?.fadeOut});
+              return func.call(this, this);
+            `)(v[0]);
+
+          return [ v[0].bind(this), v[1], v[2] ];
+        })
       )
     );
 
@@ -1962,11 +2101,19 @@ class Tooltip {
 
     return this.#updateEvents(type);
   }
-  #setEvents(type, events) {
+  #setEvents(type, events, misc) {
     const eventsObj = new Events({ events });
     events = eventsObj.getFormatted.v_$map(v =>
       v.v_$map(v =>
-        v.map(v => [ v[0].bind(this), v[1], v[2] ])
+        v.map(v => {
+          if (type == 'destruction')
+            v[0] = new Function('func', `
+              this.tooltip.deconstruct(${misc?.fadeOut});
+              return (${v[0]}).call(this, this);
+            `);
+
+          return [ v[0].bind(this), v[1], v[2] ];
+        })
       )
     );
 
@@ -1983,616 +2130,497 @@ class Tooltip {
     return this.#updateEvents(type);
   }
 
-  addTooltipEvents(events) {
-    return this.#addEvents('tooltip', events);
+  addEvents(events) {
+    return this.#addEvents('standard', events);
   }
-  setTooltipEvents(events = this.#events.tooltip.get) {
-    return this.#setEvents('tooltip', events);
+  setEvents(events = this.#events.standard.get) {
+    return this.#setEvents('standard', events);
   }
-  removeTooltipEvents(...events) {
-    return this.#removeEvents('tooltip', ...events);
+  removeEvents(...events) {
+    return this.#removeEvents('standard', ...events);
   }
-  get tooltipEvents() {
-    return this.#events.tooltip.getFormatted.events;
+  get events() {
+    return this.#events.standard.getFormatted.events;
   }
-  get sentTooltipEvents() {
-    return this.#events.tooltip.get.events;
-  }
-
-  addTooltipDeconstructors(events) {
-    return this.#addEvents('tooltipDeconstructors', events);
-  }
-  setTooltipDeconstructors(events = this.#events.tooltipDeconstructors.get) {
-    return this.#setEvents('tooltipDeconstructors', events);
-  }
-  removeTooltipDeconstructors(...events) {
-    return this.#removeEvents('tooltipDeconstructors', ...events);
-  }
-  get tooltipDeconstructors() {
-    return this.#events.tooltipDeconstructors.getFormatted.events;
-  }
-  get sentTooltipDeconstructors() {
-    return this.#events.tooltipDeconstructors.get.events;
+  get sentevents() {
+    return this.#events.standard.get.events;
   }
 
-  addAnchorEvents(events) {
-    return this.#addEvents('anchor', events);
+  #parseDestructionEvents(events) {
+    return events.v_$map(v =>
+      v === undefined || v === null ? () => void 1 : v
+    );
   }
-  setAnchorEvents(events = this.#events.anchor.get) {
-    return this.#setEvents('anchor', events);
+  addDestructionEvents(events, fadeOut) {
+    return this.#addEvents('destruction', this.#parseDestructionEvents(events), { fadeOut });
   }
-  removeAnchorEvents(...events) {
-    return this.#removeEvents('anchor', ...events);
+  setDestructionEvents(events = this.#events.destruction.get, fadeOut) {
+    return this.#setEvents('destruction', this.#parseDestructionEvents(events), { fadeOut });
   }
-  get anchorEvents() {
-    return this.#events.anchor.getFormatted.events;
+  removeDestructionEvents(...events) {
+    return this.#removeEvents('destruction', ...events);
   }
-  get sentAnchorEvents() {
-    return this.#events.anchor.get.events;
+  get destructionEvents() {
+    return this.#events.destruction.getFormatted.events;
   }
-
-  addAnchorDeconstructors(events) {
-    return this.#addEvents('anchorDeconstructors', events);
-  }
-  setAnchorDeconstructors(events = this.#events.anchorDeconstructors.get) {
-    return this.#setEvents('anchorDeconstructors', events);
-  }
-  removeAnchorDeconstructors(...events) {
-    return this.#removeEvents('anchorDeconstructors', ...events);
-  }
-  get anchorDeconstructors() {
-    return this.#events.anchorDeconstructors.getFormatted.events;
-  }
-  get sentAnchorDeconstructors() {
-    return this.#events.anchorDeconstructors.get.events;
+  get sentDestructionEvents() {
+    return this.#events.destruction.get.events;
   }
 
-  addLooseUpdate(fn, time, scope = this) {
-    const id = LooseUpdate(fn, time, scope);
-    this.#looseUpdates.push(id);
-    return id;
-  }
-  removeLooseUpdate(id) {
-    DeleteLooseUpdate(id);
-    this.#looseUpdates = this.#looseUpdates.filter(i => i != id);
-  }
   get looseUpdates() {
     return { ...update.loose }._$filter(([ k ]) => this.#looseUpdates.contains(k))._reduce((obj, [ k, { fn, scope, time } ]) =>
       (obj[k] = { 'function': fn, scope, time }) && obj,
     {});
   }
-
-  addFixedUpdate(fn, time, scope = this) {
-    const id = FixedUpdate(fn, time, scope);
-    this.#fixedUpdates.push(id);
+  requestLooseUpdate(fn, time, scope = this) {
+    this.newLooseUpdate(fn, time, scope);
+    return this;
+  }
+  newLooseUpdate(fn, time, scope = this) {
+    const id = LooseUpdate(fn, time, scope);
+    this.#looseUpdates.push(id);
     return id;
   }
-  removeFixedUpdate(id) {
-    DeleteFixedUpdate(id);
-    this.#fixedUpdates = this.#fixedUpdates.filter(i => i != id);
+  getLooseUpdate(id) {
+    return update.loose[id];
   }
+  removeLooseUpdate(id) {
+    DeleteLooseUpdate(id);
+    this.#looseUpdates = this.#looseUpdates.filter(i => i != id);
+  }
+
   get fixedUpdates() {
     return { ...update.fixed }._$filter(([ k ]) => this.#fixedUpdates.contains(k))._reduce((obj, [ k, { fn, scope, time } ]) =>
       (obj[k] = { 'function': fn, scope, time }) && obj,
     {});
   }
-
-  addInterval(fn, time, scope = this) {
-    const id = setInterval(fn.bind(scope), time);
-    this.#intervals.push({ id: id, fn, scope, time });
+  requestFixedUpdate(fn, time, scope = this) {
+    this.newFixedUpdate(fn, time, scope);
+    return this;
+  }
+  newFixedUpdate(fn, time, scope = this) {
+    const id = FixedUpdate(fn, time, scope);
+    this.#fixedUpdates.push(id);
     return id;
   }
-  removeInterval(id) {
-    clearInterval(id);
-    this.#intervals = this.#intervals.filter(v => v.id != id);
+  getFixedUpdate(id) {
+    return update.fixed[id];
   }
+  removeFixedUpdate(id) {
+    DeleteFixedUpdate(id);
+    this.#fixedUpdates = this.#fixedUpdates.filter(i => i != id);
+  }
+
   get intervals() {
     return this.#intervals._reduce((obj, { id, fn, scope, time }) =>
       (obj[id] = { 'function': fn, scope, time }) && obj,
     {});
   }
+  requestInterval(fn, time, scope = this) {
+    this.newInterval(fn, time, scope);
+    return this;
+  }
+  newInterval(fn, time, scope = this) {
+    const id = setInterval(fn.bind(scope), time);
+    this.#intervals.push({ id: id, fn, scope, time });
+    return id;
+  }
+  getInterval(id) {
+    return this.#intervals.find(v => v.id == id);
+  }
+  removeInterval(id) {
+    clearInterval(id);
+    this.#intervals = this.#intervals.filter(v => v.id != id);
+  }
 
-  update() {
-    if (this.#canceled)
-      return this;
+  superDeconstruct(called) {
+    if (!called && this.#id != -1)
+      this.#tooltip[`remove${this.#type}`](this.#id);
 
-    function getAnchorPoint($anchor, { x, y }) {
-      let parsePoint = function(v, dir) {
-        const [ dir_1, Dir_1, dir_2, Dir_2, dir_scale, Dir_scale ] = dir == 'x' ?
-          [ 'left', 'Left', 'right', 'Right', 'width', 'Width' ] :
-          [ 'top', 'Top', 'bottom', 'Bottom', 'height', 'Height' ];
+    this.#id = undefined;
+    this.#tooltip = undefined;
+    this.#type = undefined;
 
-        if (typeof v == 'string')
-          v = v.replace(new RegExp(`-${dir_scale}`), `-${dir_2}`);
+    this.#point = undefined;
+    this.#$element = undefined;
 
-        if ($anchor instanceof Window)
-          switch (v) {
-            case dir_1:
-            case `outer-${dir_1}`:
-            case `inner-${dir_1}`:
-            case `scrollbar-${dir_1}`:
-            case `content-${dir_1}`:
-              return 0;
-            case 'center':
-            case `inner-center`:
-            case `scrollbar-center`:
-            case `content-center`:
-              return window[`inner${Dir_scale}`] / 2;
-            case `outer-center`:
-              return window[`outer${Dir_scale}`] / 2;
-            case dir_2:
-            case `inner-${dir_2}`:
-            case `scrollbar-${dir_2}`:
-            case `content-${dir_2}`:
-              return window[`inner${Dir_scale}`];
-            case `outer-${dir_2}`:
-              return window[`outer${Dir_scale}`];
-            default: {
-              if (typeof v == 'string')
-                return parseCSSPosition(v, window, dir);
-              else if (typeof v == 'number')
-                return v;
-              else if (v instanceof Function)
-                return v.call(window);
-              else
-                throw new TypeError('The anchor point must be a CSS position, number, or function.');
-            }
-          }
-        else if ($anchor instanceof Node) {
-          const center = (v_1, v_2) => (v_1 + v_2) / 2;
-          const rect = $anchor.rect();
-          switch (v) {
-            case dir_1:
-            case `outer-${dir_1}`:
-              return $anchor[`outer${Dir_1}`]();
-            case `inner-${dir_1}`:
-              return $anchor[`inner${Dir_1}`]();
-            case `scrollbar-${dir_1}`:
-              return $anchor[`scrollbar${Dir_1}`]();
-            case `content-${dir_1}`:
-              return $anchor[`content${Dir_1}`]();
-            case 'center':
-            case `outer-center`:
-              return center($anchor[`outer${Dir_1}`](), $anchor[`outer${Dir_2}`]());
-            case `inner-center`:
-              return center($anchor[`inner${Dir_1}`](), $anchor[`inner${Dir_2}`]());
-            case `scrollbar-center`:
-              return rect[dir_1] + (rect[dir_scale] - this[`scrollbar${Dir_scale}`]) / 2;
-            case `content-center`:
-              return center($anchor[`content${Dir_1}`](), $anchor[`content${Dir_2}`]());
-            case dir_2:
-            case `outer-${dir_2}`:
-              return $anchor[`outer${Dir_2}`]();
-            case `inner-${dir_2}`:
-              return $anchor[`inner${Dir_2}`]();
-            case `scrollbar-${dir_2}`:
-              return $anchor[`scrollbar${Dir_2}`]();
-            case `content-${dir_2}`:
-              return $anchor[`content${Dir_2}`]();
-            default: {
-              if (typeof v == 'string')
-                return parseCSSPosition(v, $anchor, dir);
-              else if (typeof v == 'number')
-                return v + this.rect()[dir_1];
-              else if (v instanceof Function)
-                return v.call($anchor) + this.rect()[dir_1];
-              else
-                throw new TypeError('The anchor point must be a CSS position, number, or function.');
-            }
-          }
-        }
-      };
+    this.#boundingBox = undefined;
+    this.#$boundingBoxAnchor = undefined;
 
-      const obj = { x: parsePoint(x, 'x'), y: parsePoint(y, 'y') };
-      parsePoint = null;
+    this.#events?.standard.deconstruct();
+    this.#events?.destruction.deconstruct();
+    this.#events = undefined;
 
-      return obj;
-    };
+    this.#looseUpdates?.forEach(id => DeleteLooseUpdate(id));
+    this.#looseUpdates = undefined;
+    this.#fixedUpdates?.forEach(id => DeleteFixedUpdate(id));
+    this.#fixedUpdates = undefined;
+    this.#intervals?.forEach(({ id }) => clearInterval(id));
+    this.#intervals = undefined;
 
-    const originPoint = getAnchorPoint(this.#$tooltip, this.#origin);
-    const offsetPoint = this.#offsets.reduce(function(totalOffset, offset) {
-      return {
-        x: totalOffset.x + parsePoint(offset.x, 'x'),
-        y: totalOffset.y + parsePoint(offset.y, 'y'),
-      };
-    }, { x: 0, y: 0 });
-    const anchorPoint = getAnchorPoint(this.#$anchor, this.#anchorPoints);
+    DeleteLooseUpdate(this.#memoryCheckUpdate);
+    this.#memoryCheckUpdate = undefined;
 
-    this.#$tooltip.style.position = 'fixed';
-    this.#$tooltip.style.left = `${anchorPoint.x - originPoint.x + offsetPoint.x}px`;
-    this.#$tooltip.style.top = `${anchorPoint.y - originPoint.y + offsetPoint.y}px`;
+    this.#getAnchorPoint = undefined;
+  }
+}
+
+class Tooltip extends Modifier {
+  #canceled = false;
+  get canceled() {
+    return this.#canceled;
+  }
+  #fadingOut = false;
+  get fadingOut() {
+    return this.#fadingOut;
+  }
+
+  #firstUpdate = true;
+
+  #follow;
+  constructor($tooltip = 'div', $parent, text, addFunc = Element.prototype.appendChild, events, deconstructionEvents) {
+    $tooltip = $tooltip instanceof Element ? $tooltip : document.createElementByQs($tooltip);
+    super('center', 'center', $tooltip, events, deconstructionEvents, null, 'Tooltip');
+
+    $parent = $parent instanceof Element ? $parent : (function() {
+      try {
+        return document.createElementByQs($parent);
+      } catch (er) {
+        return window;
+      }
+    })();
+
+    this.element.style.position = 'fixed';
+    this.element.setAttr('tooltip', true);
+    this.element.innerHTML = text;
+
+    (addFunc instanceof Function ? addFunc : Element.prototype.appendChild).call(
+      $parent instanceof Element ? $parent : body,
+      this.element,
+      this
+    );
+
+    this.update = this.update.bind(this);
+    return this;
+  }
+  create(time, fadeIn, update = true) {
+    if (!+time)
+      return update ? this.update() : this;
+
+    const opacityTo = +(this.element.getCS('opacity') || 1);
+    this.element.style.opacity = 0;
+    this.element.style.pointerEvents = 'none';
+
+    const startTransition = this.element.style.transition;
+    setTimeout(function() {
+      if (this.canceled || this.fadingOut || !this.element)
+        return;
+
+      this.element.style.pointerEvents = '';
+      this.element.style.transition = (this.element.style.transition).split(',').concat(`opacity ${fadeIn}ms`).join(',').replace(/^,/, '');
+      this.element.style.opacity = opacityTo;
+
+      setTimeout(function() {
+        if (this.canceled || this.fadingOut || !this.element)
+          return;
+
+        this.element.style.transition = startTransition;
+        this.element.style.opacity = '';
+      }.bind(this), fadeIn);
+
+      if (update)
+        this.update();
+    }.bind(this), time);
 
     return this;
   }
-  follow(v) {
-    if (v === undefined)
-      return bool(this.#follow);
 
+  moveAbove($element) {
+    this.element.style.zIndex = $element.getParsedCS('z-index') + 1;
+    return this;
+  }
+  setCSS(style) {
+    this.element.setCSS(style);
+    return this;
+  }
+  addCSS(style) {
+    this.element.addCSS(style);
+    return this;
+  }
+  removeCSS(...styles) {
+    this.element.removeCSS(...styles);
+    return this;
+  }
+
+  setOrigin(x, y, events, deconstructionEvents) {
+    this.setPoint(x, y);
+
+    if (events)
+      this.setEvents(events);
+    if (deconstructionEvents)
+      this.setDestructionEvents(deconstructionEvents);
+
+    return this;
+  }
+  get origin() {
+    return { element: this.element, ...this.point };
+  }
+  get parsedOrigin() {
+    return { element: this.element, ...this.parsedPoint };
+  }
+
+  #anchor = class Anchor extends Modifier {
+    #weight = 1;
+
+    constructor(x, y, $element, weight = 1, events, deconstructionEvents, tooltip) {
+      super(x, y, $element, events, deconstructionEvents, tooltip, 'Anchor');
+
+      this.#weight = +weight;
+    }
+
+    setAnchor(x, y, $element, weight = this.#weight, events, deconstructionEvents) {
+      if (!($element instanceof Window || $element instanceof Node))
+        throw new TypeError('The relative element must be a Window or Node.');
+
+      this.setPoint(x, y);
+      this.setElement($element);
+      this.#weight = +weight;
+
+      if (events)
+        this.setEvents(events);
+      if (deconstructionEvents)
+        this.setDestructionEvents(deconstructionEvents);
+
+      return this;
+    }
+    get anchor() {
+      return { element: this.element, ...this.point, weight: this.weight };
+    }
+    get parsedAnchor() {
+      return { element: this.element, ...this.parsedPoint, weight: this.weight };
+    }
+
+    setWeight(weight = this.#weight) {
+      this.#weight = +weight;
+      return this;
+    }
+    get weight() {
+      return this.#weight;
+    }
+
+    deconstruct(called) {
+      if (!called)
+        this.tooltip.removeAnchor(this.id);
+
+      this.#weight = undefined;
+      this.superDeconstruct(true);
+    }
+  }
+  #anchors = {};
+  get anchors() {
+    return this.#anchors;
+  }
+  requestAnchor(...params) {
+    return this.newAnchor(...params) && this;
+  }
+  newAnchor(x, y, $element, weight, events, deconstructionEvents) {
+    const anchor = new this.#anchor(x, y, $element, weight, events, deconstructionEvents, this);
+    return this.#anchors[anchor.id] = anchor;
+  }
+  getAnchor(id) {
+    return this.#anchors[id];
+  }
+  removeAnchor(id) {
+    this.#anchors[id]?.deconstruct(true);
+    delete this.#anchors[id];
+    return this;
+  }
+
+  #offset = class Offset extends Modifier {
+    constructor(x, y, $element = 'tooltip', events, deconstructionEvents, tooltip) {
+      super(x, y, $element, events, deconstructionEvents, tooltip, 'Offset');
+    }
+
+    setOffset(x, y, $element, events, deconstructionEvents) {
+      if (!($element instanceof Window || $element instanceof Node))
+        throw new TypeError('The relative element must be a Window or Node.');
+
+      this.setPoint(x, y);
+      this.setElement($element);
+
+      if (events)
+        this.setEvents(events);
+      if (deconstructionEvents)
+        this.setDestructionEvents(deconstructionEvents);
+
+      return this;
+    }
+    get offset() {
+      return { element: this.element, ...this.point };
+    }
+    get parsedOffset() {
+      return { element: this.element, ...this.parsedPoint };
+    }
+
+    deconstruct(called) {
+      if (!called)
+        this.tooltip.removeOffset(this.id);
+
+      this.superDeconstruct(true);
+    }
+  }
+  #offsets = {};
+  get offsets() {
+    return this.#offsets;
+  }
+  requestOffset(...params) {
+    return this.newOffset(...params) && this;
+  }
+  newOffset(x = 0, y = 0, $element, events, deconstructionEvents) {
+    const offset = new this.#offset(x, y, $element, events, deconstructionEvents, this);
+    return this.#offsets[offset.id] = offset;
+  }
+  getOffset(id) {
+    return this.#offsets[id];
+  }
+  removeOffset(id) {
+    this.#offsets[id]?.deconstruct(true);
+    delete this.#offsets[id];
+    return this;
+  }
+
+  update(smoothing = 1) {
+    if (this.#canceled)
+      return this;
+
+    if (!this.#firstUpdate) {
+      this.#firstUpdate = true;
+      smoothing = 1;
+    }
+
+    const originPoint = this.parsedPoint;
+
+    const offsetPoint = this.#offsets.v_reduce(function(totalOffset, offset) {
+      const { x, y } = offset.parsedPoint;
+      return {
+        x: totalOffset.x + x,
+        y: totalOffset.y + y,
+      };
+    }.bind(this), { x: 0, y: 0 });
+
+    const anchorPoint = this.#anchors.v_reduce(function(totalAnchor, anchor) {
+      const { x, y } = anchor.parsedPoint;
+      return {
+        x: totalAnchor.x + x * anchor.weight,
+        y: totalAnchor.y + y * anchor.weight,
+        weight: totalAnchor.weight + anchor.weight,
+      };
+    }, { x: 0, y: 0, weight: 0 });
+    (anchorPoint.x /= anchorPoint.weight || 1), (anchorPoint.y /= anchorPoint.weight || 1);
+
+    (function($tooltip) {
+      $tooltip.style.position = 'fixed';
+      const vx = (anchorPoint.x - originPoint.x + offsetPoint.x) - $tooltip.rect().x;
+      const vy = (anchorPoint.y - originPoint.y + offsetPoint.y) - $tooltip.rect().y;
+
+      if (!(smoothing instanceof Function))
+        smoothing = new Function('v', `return v * ${+smoothing};`);
+
+      let x = $tooltip.rect().x + smoothing(vx);
+      let y = $tooltip.rect().y + smoothing(vy);
+
+      const { x1, y1, x2, y2 } = this.parsedBoundingBox;
+
+      x = x.clamp(x1, x2 - $tooltip.rect().w);
+      y = y.clamp(y1, y2 - $tooltip.rect().h);
+
+      $tooltip.style.left = `${x}px`;
+      $tooltip.style.top = `${y}px`;
+    }).bind(this)(this.element);
+
+    return this;
+  }
+  follow(v = true, smoothing = 1, speed = 1) {
     if (v && this.#follow === undefined)
-      this.#follow = FixedUpdate(this.update);
+      this.#follow = FixedUpdate(() => this.update(smoothing), speed);
     else if (!v && this.#follow !== undefined) {
       DeleteFixedUpdate(this.#follow);
       this.#follow = undefined;
     }
 
-
     return this;
   }
-
-  deconstruct() {
-    this.#canceled = true;
-
-    this.#origin = undefined;
-
-    this.#$anchor = undefined;
-    this.#anchorPoints = undefined;
-
-    this.#follow = undefined;
-
-    DeleteLooseUpdate(this.#memoryCheckUpdate);
-
-    this.#looseUpdates.forEach(id => DeleteLooseUpdate(id));
-    this.#looseUpdates = undefined;
-    this.#fixedUpdates.forEach(id => DeleteFixedUpdate(id));
-    this.#fixedUpdates = undefined;
-    this.#intervals.forEach(({ id }) => clearInterval(id));
-    this.#intervals = undefined;
-
-    this.#events.tooltip.deconstruct();
-    this.#events.anchor.deconstruct();
-
-    this.#events.tooltipDeconstructors.deconstruct();
-    this.#events.anchorDeconstructors.deconstruct();
-
-    this.#events = undefined;
-
-    this.#$tooltip.memRmv();
-    this.#$tooltip = undefined;
+  get following() {
+    return bool(this.#follow);
   }
-  get canceled() {
-    return this.#canceled;
+
+  deconstruct(fadeOut = 0) {
+    if (!this.element || this.#canceled)
+      return;
+
+    this.#canceled = true;
+    this.#fadingOut = true;
+
+    this.element.style.pointerEvents = 'none';
+    this.element.style.opacity = +(this.element.getCS('opacity') || 1);
+    this.element.style.transition = (this.element.style.transition).split(',').concat(`opacity ${fadeOut}ms`).join(',').replace(/^,/, '');
+
+    this.element.style.opacity = 0;
+    setTimeout(function() {
+      this.#fadingOut = undefined;
+      this.#firstUpdate = undefined;
+
+      this.follow(false);
+      this.#follow = undefined;
+
+      this.#offsets?.v_forEach(v => this.removeOffset.call(this, v.id));
+      this.#offsets = undefined;
+
+      this.#anchors?.v_forEach(v => this.removeAnchor.call(this, v.id));
+      this.#anchors = undefined;
+
+      this.element?.memRmv();
+
+      this.superDeconstruct(true);
+    }.bind(this), fadeOut);
   }
 }
 
-setTimeout(() => {
+/* setTimeout(() => {
   const $tt = new Tooltip('div.tooltip', body)
-    .setOrigin('center', 'center')
-    .setAnchor('center', 'center')
-    .requestOffset(0, 0, window)
-    .addAnchorEvents({
-      mouseup: function(ev) {
-        this.follow(true);
-        this.$tooltip.rmvAttr('mousedown');
-      },
-      mousemove: function(ev) {
-        if (this.$tooltip.getAttr('mousedown')) {
-          this.$tooltip.style.left = `${ev.clientX - +this.$tooltip.getAttr('offsetX')}px`;
-          this.$tooltip.style.top = `${ev.clientY - +this.$tooltip.getAttr('offsetY')}px`;
-        }
-      },
-    })
-    .addTooltipEvents({
-      mousedown: [
-        function(ev) {
-          if (ev.button == 1)
-            this.getOffset(0).setOffset(ev.pageX - vw(50), ev.clientY - vh(50)) && tt2.update();
-        },
-        function(ev) {
-          this.follow(false);
-          this.$tooltip.setAttr('mousedown', true);
-          this.$tooltip.setAttr('offsetX', ev.offsetX);
-          this.$tooltip.setAttr('offsetY', ev.offsetY);
-        },
-      ],
-    })
-    .follow(true)
-    .$tooltip;
-
-  const tt2 = new Tooltip('div.tooltip', $tt, 'tooltip', $ => body.appendChild($)).setOriginY('top').setOffsetY('1vmin').setAnchorY('bottom');
+    .setOrigin('global-mouse', 'global-mouse')
+    .requestOffset('-50%', '-50%')
+    .follow(true, 1, 0.1)
+    .element;
 
   $tt.style.width = '10vw';
   $tt.style.height = '10vh';
   $tt.style.backgroundColor = 'red';
 
-  requestAnimationFrame(tt2.update)
-}, 400);
+  $tt.style.zIndex = 9999;
 
-class TooltipOld {
-  #created;
+  const tt_x = new Tooltip('div.tooltip', $tt, 'tooltip', $ => body.appendChild($))
+    .setPoint('center', 'top')
+    .requestAnchor('center', 0, $tt)
+    .requestOffset(0, '0.5vh')
+    .follow(true, 1, 0.05)
+    .requestFixedUpdate(function() {
+      this.element.textContent = Math.round(this.element.rect().x);
+    });
 
-  #type;
-  #tooltip;
+  tt_x.element.style.zIndex = 10000;
 
-  #text;
+  const tt_y = new Tooltip('div.tooltip', $tt, 'tooltip', $ => body.appendChild($))
+    .setPoint('left', 'center')
+    .requestAnchor(0, 'center', $tt)
+    .requestOffset('0.5vw')
+    .follow(true, 1, 0.05)
+    .requestFixedUpdate(function() {
+      this.element.textContent = Math.round(this.element.rect().y);
+    });
 
-  #x;
-  #y;
-
-  #anchor_x;
-  #anchor_y;
-
-  #delay;
-
-  #destroyFuncs;
-
-  #update;
-  #updateInterval = {};
-
-  #eventsCtrl;
-
-  /**
-   * Creates a new tooltip object.
-   * @param {string} [type='text'] - The type of the tooltip.
-   * @param {string} [text='tooltip'] - The text content of the tooltip.
-   * @param {number} x - The x-coordinate of the tooltip.
-   * @param {number} y - The y-coordinate of the tooltip.
-   * @param {string} [anchor_x='left'] - The horizontal anchor point of the tooltip.
-   * @param {string} [anchor_y='top'] - The vertical anchor point of the tooltip.
-   * @param {number} [delay=0] - The delay before showing the tooltip.
-   * @param {object} [destroyFuncs={ time: { max: 1000 } }] - The destruction functions for the tooltip.
-   * @param {string} [id] - The ID of the tooltip element.
-   * @param {string|string[]} [classes] - The CSS classes to apply to the tooltip element.
-   */
-  constructor(
-    type = 'text',
-    text = 'tooltip',
-    x, y,
-    anchor_x = 'left', anchor_y = 'top',
-    delay = 0,
-    destroyFuncs = { time: { max: 1000 } },
-    id, classes,
-    update,
-    animate = true
-  ) {
-    this.#created = false;
-    this.#type = type;
-
-    const tooltip = document.createElement('tooltip');
-    if (id)
-      tooltip.id = id;
-
-    if (typeof classes == 'string')
-      classes = [ classes ];
-    if (classes instanceof Array)
-      tooltip.classList.add(...classes);
-
-    tooltip.classList.add('tooltip');
-    tooltip.innerHTML = this.#text = text;
-
-    this.#tooltip = tooltip;
-
-    this.#x = x;
-    this.#y = y;
-
-    this.#anchor_x = anchor_x;
-    this.#anchor_y = anchor_y;
-
-    this.#delay = delay;
-    if (animate)
-      tooltip.style.animation = `fadeIn 250ms linear ${delay}ms 1 normal forwards`;
-    else
-      tooltip.style.opacity = 1;
-
-    this.#destroyFuncs = destroyFuncs;
-
-    this.#update = update;
-  }
-  get tooltip() {
-    return this.#tooltip;
-  }
-  set text(text) {
-    this.#tooltip.innerHTML = this.#text = text;
-  }
-  get text() {
-    return this.#text;
-  }
-  set x(x) {
-    this.#x = x;
-  }
-  get x() {
-    return this.#x;
-  }
-  set y(x) {
-    this.#y = y;
-  }
-  get y() {
-    return this.#y;
-  }
-  set anchor_x(x) {
-    this.#anchor_x = anchor_x;
-  }
-  get anchor_x() {
-    return this.#anchor_x;
-  }
-  set anchor_y(y) {
-    this.#anchor_y = anchor_y;
-  }
-  get anchor_y() {
-    return this.#anchor_y;
-  }
-  set delay(delay) {
-    this.#delay = delay;
-    if (!this.#created)
-      this.#tooltip.style.animation = `fadeIn 250ms linear ${delay}ms 1 normal forwards`;
-  }
-  get delay() {
-    return this.#delay;
-  }
-  set destroyFunctions(destroyFuncs) {
-    this.#destroyFuncs = destroyFuncs;
-  }
-  get destroyFunctions() {
-    return this.#destroyFuncs;
-  }
-  set id(id) {
-    if (id && this.#tooltip)
-      this.#tooltip.id = id;
-    else if (this.#tooltip)
-      delete this.#tooltip.id;
-  }
-  get id() {
-    return this.#tooltip?.id;
-  }
-  set classes(classes) {
-    const tooltip = this.#tooltip;
-    if (!tooltip || !tooltip.classList)
-      return;
-
-    tooltip.classList.forEach(thisClass => tooltip.classList.remove(thisClass));
-
-    if (typeof classes === 'string')
-      classes = [classes];
-    if (classes instanceof Array)
-      classes.forEach(thisClass => tooltip.classList.add(thisClass));
-  }
-  get classes() {
-    return this.#tooltip?.classList.values;
-  }
-  get update() {
-    return this.#update;
-  }
-  set update(update) {
-    update = update;
-
-    this.#update = update;
-    if (this.#updateInterval.type == 'loose')
-      DeleteLooseUpdate(this.#updateInterval.id);
-    else if (this.#updateInterval.type == 'fixed')
-      DeleteFixedUpdate(this.#updateInterval.id);
-    else if (this.#updateInterval.type == 'interval')
-      clearInterval(this.#updateInterval.interval);
-
-    if (update == 'fixed')
-      this.#updateInterval = { id: FixedUpdate(this.update), type: 'fixed' };
-    else if (update == 'loose')
-      this.#updateInterval = { id: LooseUpdate(this.update), type: 'loose' };
-    else if (typeof update == 'number')
-      this.#updateInterval = { interval: setInterval(this.update, update), type: 'interval' };
-  }
-  create() {
-    const tooltip = this.#tooltip;
-    if (!tooltip || (this.#type == 'help' && global.settings.tips.helpEnabled))
-      return this.destroy();
-
-    if (this.#created)
-      return;
-
-    this.#created = true;
-
-    if (!(this.#destroyFuncs instanceof Object))
-      this.#destroyFuncs = {};
-
-    this.#destroyFuncs.time ??= { min: 0 };
-    const { leave, out, click, time } = this.#destroyFuncs;
-
-    let minTime = +time.min;
-    minTime = Number.isFinite(minTime) ? minTime : 0;
-
-    const thisClass = this;
-    const startTime = Date.now();
-
-    const crtl = this.#eventsCtrl = new AbortController();
-
-    if (leave instanceof Element)
-      leave.addEventListener('mouseleave', () => setTimeout(thisClass.destroy, minTime - (Date.now() - startTime)), { signal: crtl.signal });
-    if (out instanceof Element)
-      out.addEventListener('mouseout', function(e) {
-        if (out.childOf(e.relatedTarget, true))
-          setTimeout(thisClass.destroy, minTime - (Date.now() - startTime)), { signal: crtl.signal }
-      });
-    if (click instanceof Element)
-      click.addEventListener('click', () => setTimeout(thisClass.destroy, minTime - (Date.now() - startTime)), { signal: crtl.signal });
-    if (time.max)
-      setTimeout(() => this.destroy(), Math.max(Number.isFinite(+time.max) ? +time.max : 0, minTime));
-
-    body.appendChild(tooltip);
-
-    const mouseMoveEvent = new Event('mousemove', { bubbles: true });
-    addEventListener('mousemove', this.update, { capture: true, signal: crtl.signal });
-    dispatchEvent(mouseMoveEvent);
-
-    this.update({ clientX: global.mouse_x, clientY: global.mouse_y });
-
-    if (this.#update == 'fixed')
-      this.#updateInterval = { id: FixedUpdate(this.update), type: 'fixed' };
-    else if (this.#update == 'loose')
-      this.#updateInterval = { id: LooseUpdate(this.update), type: 'loose' };
-    else if (typeof this.#update == 'number')
-      this.#updateInterval = { interval: setInterval(this.update, this.#update), type: 'interval' };
-
-    return tooltip;
-  }
-  destroy = (animate = true) => {
-    const tooltip = this.#tooltip;
-    if (!tooltip) {
-      this.#eventsCtrl?.abort();
-      return;
-    }
-
-    const opacity = getComputedStyle(tooltip).getPropertyValue('opacity');
-
-    tooltip.style.opacity = opacity;
-    if (opacity == 0)
-      tooltip.memRmv();
-
-    if (animate) {
-      tooltip.style.animation = `fadeOut 250ms linear ${-250 * (1 - opacity) << 0}ms 1 normal forwards`;
-      tooltip.onanimationend = tooltip.memRmv;
-    } else
-      tooltip.memRmv();
-
-    if (this.#updateInterval.type == 'loose')
-      DeleteLooseUpdate(this.#updateInterval.id);
-    else if (this.#updateInterval.type == 'fixed')
-      DeleteFixedUpdate(this.#updateInterval.id);
-    else if (this.#updateInterval.type == 'interval')
-      clearInterval(this.#updateInterval.interval);
-
-    this.#eventsCtrl?.abort();
-  }
-  update = e => {
-    const tooltip = this.#tooltip;
-    if (!tooltip || (this.#type == 'help' && !global.settings.tips.helpEnabled))
-      return this.destroy();
-
-    const { w, h } = tooltip.rect();
-    let x = this.#x ?? e.clientX;
-    let y = this.#y ?? e.clientY;
-
-    const anchor_x = this.#anchor_x;
-    const anchor_y = this.#anchor_y;
-
-    switch (anchor_x) {
-      default:
-      case 'left':
-        break;
-      case 'center':
-        x -= w / 2;
-        break;
-      case 'right':
-        x -= w;
-        break;
-    }
-
-    switch (anchor_y) {
-      case 'top':
-        break;
-      case 'center':
-        y -= h / 2;
-        break;
-      default:
-      case 'bottom':
-        y -= h;
-        break;
-    }
-
-    x = x.clamp(0, innerWidth - w);;
-    y = y.clamp(0, innerHeight - h);
-
-    tooltip[`${Dir_1}`] = `${x}px`;
-    tooltip.style.top = `${y}px`;
-  }
-}
+  tt_y.element.style.zIndex = 10000;
+}, 400); */
 
 function EvalKeyPath(kPath) {
   try {

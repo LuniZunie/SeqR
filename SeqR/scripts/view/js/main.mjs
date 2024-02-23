@@ -16,6 +16,7 @@
 
 /**
  * @typedef { Events } Events
+ * @typedef { Tooltip } Tooltip
 */
 
 import * as globalExports from '../../global/js/global.mjs';
@@ -42,10 +43,8 @@ const page = {
     main: true,
     events: false,
   },
-  tooltips: {
-    fileNames: [],
-  },
-  currentAutoGroup: '',
+  events: null,
+  currentAutoGroup: GetAutoGroup(),
 };
 
 LooseUpdate(function(e) {
@@ -69,6 +68,8 @@ function Loaded() {
     $loadingScreen.addClass('hide');
     setTimeout(() => $loadingScreen?.memRmv(), parseTransition($loadingScreen).max());
   })(body.qs('body > .loading_screen'));
+
+  UpdateSettingsTextPreview();
 }
 
 function WaitForLoad() {
@@ -94,9 +95,14 @@ FixedUpdate(function(e) {
   body.qs('body > .top > .draw').setClass('disabled', global.groups.length <= AreGroupsClean().length);
   body.qs('body > .top > .export').setClass('disabled', !body.qs('body > .content > .easel > svg.paper:not(.template)'));
 
-  body.qs('body > .side > .content > .auto.button').setClass('disabled', !global.data._len() || page.currentAutoGroup == GetAutoGroup());
+  body.qs('body > .side > .content > .auto.button').setClass('disabled', page.currentAutoGroup == GetAutoGroup());
   body.qs('body > .side > .content > .clean.button').setClass('disabled', !AreGroupsClean().length);
   body.qs('body > .side > .content > .remove_all.button').setClass('disabled', !global.groups.length);
+
+  body.qsa('body > .side > .content > .groups > group > .content > .edit.button').forEach($ => $.setClass('disabled', !global.data?._len()));
+  body.qsa('body > .side > .content > .groups > group > .content > .format.button').forEach($ =>
+    $.setClass('disabled', $.gen(-1).qsa('.data:not(.template)').length == 0)
+  );
 
   const clip = JSON.stringify(global.clipboard?.data);
   (global.groups ?? []).forEach(
@@ -1248,7 +1254,6 @@ function UpdateSettingsTextPreview() {
     page.events.get.settings_background.input.call(body.qs('body > .settings > .background > input'));
   })(body.qs('body > .settings > .text_style > .content'));
 }
-setTimeout(UpdateSettingsTextPreview, 100);
 
 function CreateFileName() {
   return `SeqR_${TimeString().replace(', ', '_')}`;

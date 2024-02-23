@@ -29,7 +29,7 @@ Object.defineProperty(Array.prototype, 'prandom', {
       return this[Math.floor(Prandom(seed, i) * this.length)];
   }
 });
-Object.defineProperty(Array.prototype, 'dist', {
+Object.defineProperty(Array.prototype, 'distance', {
   enumerable: false,
   value: function(...arrs) {
     return this.reduce((dist, v, i) => {
@@ -38,6 +38,10 @@ Object.defineProperty(Array.prototype, 'dist', {
       )) ** 2;
     }, 0) ** (1 / (arrs.length + 1));
   }
+});
+Object.defineProperty(Array.prototype, 'dist', {
+  enumerable: false,
+  value: Array.prototype.distance
 });
 Object.defineProperty(Array.prototype, 'min', {
   enumerable: false,
@@ -59,13 +63,17 @@ Object.defineProperty(Array.prototype, 'sum', {
     0);
   }
 });
-Object.defineProperty(Array.prototype, 'avg', {
+Object.defineProperty(Array.prototype, 'average', {
   enumerable: false,
   value: function() {
     return this.reduce(
       (sum, v) => sum + v,
     0) / this.length;
   }
+});
+Object.defineProperty(Array.prototype, 'avg', {
+  enumerable: false,
+  value: Array.prototype.average
 });
 Object.defineProperty(Array.prototype, 'clamp', {
   enumerable: false,
@@ -131,10 +139,13 @@ Object.defineProperty(Array.prototype, 'toLength', {
 [ NodeList, HTMLCollection, DOMTokenList, Object ].forEach(obj => {
   [
     'at',
+    'average',
+    'avg',
     'clamp',
     'concat',
     'contains',
     'copyWithin',
+    'distance',
     'dist',
     'entries',
     'every',
@@ -780,12 +791,10 @@ Object.defineProperty(Document.prototype, 'createElementByQs', {
   Object.defineProperty(obj.prototype, 'getComputedStyle', {
     enumerable: false,
     value: function(property, $pseudo) {
-      if (property !== undefined)
-        return getComputedStyle(this, $pseudo)[property.split('-').map((v, i) =>
-          i ? v.capitalize() : v
-        ).join('')];
-      else
+      if (property === undefined)
         return getComputedStyle(this, $pseudo);
+      else
+        return getComputedStyle(this, $pseudo).getPropertyValue(property);
     }
   });
   Object.defineProperty(obj.prototype, 'getCS', {
@@ -796,12 +805,10 @@ Object.defineProperty(Document.prototype, 'createElementByQs', {
     enumerable: false,
     value: function($pseudo, ...properties) {
       if (properties.length)
-        return (
-          cs => Object.fromEntries(properties.map(v =>
-            v.split('-').map((v, i) =>
-              i ? v.capitalize() : v
-            ).join('')
-          ).map(v => [ v, cs[v] ]).filter(v => v[1] !== undefined))
+        return (cs =>
+          Object.fromEntries(properties.map(property =>
+            [ property, cs.getPropertyValue(property) ]
+          ))
         )(getComputedStyle(this, $pseudo));
       else
         return getComputedStyle(this, $pseudo);
@@ -821,7 +828,17 @@ Object.defineProperty(Document.prototype, 'createElementByQs', {
   Object.defineProperty(obj.prototype, 'addCSS', {
     enumerable: false,
     value: function(css) {
-      this.style.cssText += css._reduce((str, [ k, v ]) => `${str}${k}:${v};`, '');
+      this.style.cssText = `${this.style.cssText};${css._reduce((str, [ k, v ]) => `${str}${k}:${v};`, '')}`.replace(/^;/, '');
+      return this;
+    }
+  });
+  Object.defineProperty(obj.prototype, 'removeCSS', {
+    enumerable: false,
+    value: function(...properties) {
+      properties.forEach(
+        property => this.style.removeProperty(property)
+      );
+
       return this;
     }
   });
@@ -1255,6 +1272,29 @@ Object.defineProperty(Document.prototype, 'createElementByQs', {
     value: function($, includeSelf = false) {
       return (includeSelf && this.isEqualNode($)) || this.genAll(0, Infinity).flat(Infinity).some($child => $?.isEqualNode($child));
     }
+  });
+  Object.defineProperty(obj.prototype, 'getParsedComputerStyle', {
+    enumerable: false,
+    value: function(property, notEqualTo = 'auto') {
+      return (this.gen(-Infinity, 0).reverse().find($ =>
+        ($.getCS?.(property) ?? notEqualTo) != notEqualTo
+      )?.getCS?.(property) ?? 0);
+    },
+  });
+  Object.defineProperty(obj.prototype, 'getParsedCS', {
+    enumerable: false,
+    value: obj.prototype.getParsedComputerStyle
+  });
+  Object.defineProperty(obj.prototype, 'getParsedComputerStyles', {
+    enumerable: false,
+    value: function(...properties) {
+      const notEqualTo = properties.pop() ?? 'auto';
+      return properties.map(property => this.getParsedComputerStyle(property, notEqualTo));
+    }
+  });
+  Object.defineProperty(obj.prototype, 'getParsedCSs', {
+    enumerable: false,
+    value: obj.prototype.getParsedComputerStyles
   });
   Object.defineProperty(obj.prototype, 'addClass', {
     enumerable: false,

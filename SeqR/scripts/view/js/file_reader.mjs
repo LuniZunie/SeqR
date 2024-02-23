@@ -223,6 +223,58 @@ async function FileReader(e) {
   let fileSaveNames = [];
 
   const metadataParser = [];
+  const metadataLocations = {};
+  function MetaDataHandler(line) {
+    const file = fileSaveNames.last();
+    const metaDataI = metadataLocations[file.name]++;
+
+    metadataParser.push(new Promise(async r => {
+      const octothorpes = line.match(/^#*/)[0];
+      line = line.slice(octothorpes.length).split(/\s/);
+
+      const segments = [];
+      const segmentPromises = [];
+      for (const segment of line)
+        segmentPromises.push(new Promise(async r => {
+          try {
+            const url = new URL(segment).href; // make sure it's a valid url before wasting resources on it
+            const obj = {
+              type: 'link',
+              link: segment,
+            };
+
+            try {
+              obj.text = (await timedFetch(`https://corsproxy.io/?${encodeURIComponent(url)}`, {}, 1000).then(res =>
+                res.text()
+              )).match(/<title>(.*)<\/title>/)[1];
+            } finally {
+              r(obj);
+            }
+          } catch (err) {
+            r(segment);
+          }
+        }).then(v => segments.push(v)));
+
+      await Promise.all(segmentPromises);
+
+      file.metaData[metaDataI] = {
+        segments: segments.reduce((arr, v) =>
+          v instanceof Object ?
+            arr.concat(v) :
+            (function(last) {
+              if (arr[last] === undefined || arr[last] instanceof Object)
+                return arr.concat(v);
+              else
+                return arr.slice(0, last).concat(`${arr[last]} ${v}`);
+            })(arr.length - 1), []
+        ).filter(v => v != ''),
+        label: octothorpes,
+      };
+
+      r('done');
+    }));
+  }
+
   const handlers = {
     gff: function(line, emptyCache, misc) {
       if (rejected)
@@ -269,44 +321,7 @@ async function FileReader(e) {
 
       ++lineNum;
       if (line[0] == '#') { // comment defintions should only be at the start of the line
-        if (line[1] == '#' && line[2] != '#' && line.trim() != '##') // meta-data
-          metadataParser(new Promise(async r => {
-            line = line.slice(2).split(/\s/);
-            const segments = [];
-            for (const segment of line)
-              await new Promise(async r => {
-                try {
-                  const url = new URL(segment).href; // make sure it's a valid url
-                  const obj = {
-                    type: 'link',
-                    link: segment,
-                  };
-
-                  try {
-                    obj.text = (await timedFetch(`https://corsproxy.io/?${encodeURIComponent(url)}`, {}, 1000).then(res =>
-                      res.text()
-                    )).match(/<title>(.*)<\/title>/)[1];
-                  } finally {
-                    r(obj);
-                  }
-                } catch (err) {
-                  r(segment);
-                }
-              }).then(v => segments.push(v));
-
-            fileSaveNames.last().metaData.push(segments.reduce((arr, v) =>
-              v instanceof Object ?
-                arr.concat(v) :
-                (function(last) {
-                  if (arr[last] === undefined || arr[last] instanceof Object)
-                    return arr.concat(v);
-                  else
-                    return arr.slice(0, last).concat(`${arr[last]} ${v}`);
-                })(arr.length - 1), []
-            ).filter(v => v != ''));
-
-            r('done');
-          }));
+        MetaDataHandler(line);
 
         return clearCache();
       } else if (line.startsWith('browser') || line.startsWith('track'))
@@ -390,43 +405,7 @@ async function FileReader(e) {
 
       ++lineNum;
       if (line[0] == '#') { // comment defintions should only be at the start of the line
-        if (line[1] == '#' && line[2] != '#' && line.trim() != '##') // meta-data
-          metadataParser.push(new Promise(async r => {
-            line = line.slice(2).split(/\s/);
-            const segments = [];
-            for (const segment of line)
-              await new Promise(async r => {
-                try {
-                  const url = new URL(segment).href; // make sure it's a valid url
-                  const obj = {
-                    type: 'link',
-                    link: segment,
-                  };
-
-                  try {
-                    obj.text = (await timedFetch(`https://corsproxy.io/?${encodeURIComponent(url)}`, {}, 1000).then(res => res.text()
-                    )).match(/<title>(.*)<\/title>/)[1];
-                  } finally {
-                    r(obj);
-                  }
-                } catch (err) {
-                  r(segment);
-                }
-              }).then(v => segments.push(v));
-
-            fileSaveNames.last().metaData.push(segments.reduce((arr, v) =>
-              v instanceof Object ?
-                arr.concat(v) :
-                (function(last) {
-                  if (arr[last] === undefined || arr[last] instanceof Object)
-                    return arr.concat(v);
-                  else
-                    return arr.slice(0, last).concat(`${arr[last]} ${v}`);
-                })(arr.length - 1), []
-            ).filter(v => v != ''));
-
-            r('done');
-          }));
+        MetaDataHandler(line);
 
         return clearCache();
       } else if (line.startsWith('browser') || line.startsWith('track'))
@@ -521,7 +500,11 @@ async function FileReader(e) {
       }
 
       ++lineNum;
-      if (line[0] == '#' || line.startsWith('browser') || line.startsWith('track')) // comment defintions should only be at the start of the line
+      if (line[0] == '#') { // comment defintions should only be at the start of the line
+        MetaDataHandler(line);
+
+        return clearCache();
+      } else if (line.startsWith('browser') || line.startsWith('track'))
         return clearCache();
 
       let [ chrom, start, end, name, score, strand, thickStart, thickEnd, rgb, blockCount, blockSizes, blockStarts ] = line.split(lineSplitRegExps.bed);
@@ -841,6 +824,7 @@ async function FileReader(e) {
           name = `${file.name} (${i++})`;
 
         fileSaveNames.push({ name, metaData: [] });
+        metadataLocations[file.name] = 0;
 
         void (function($file) {
           $file.setAttr('raw-name', file.name);

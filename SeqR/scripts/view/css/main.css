@@ -215,7 +215,7 @@ body > .top > .delete_data.button > .confirm.hide > svg {
 
   transform: translateY(calc(calc(var(--top_height) - 2px - 2vh) * -1.1));
 
-  transition: height 500ms, width 500ms, opacity 500ms, transform 200ms, filter 250ms, padding 250ms;
+  transition: width 500ms, height 500ms, opacity 500ms, transform 200ms, filter 250ms, padding 250ms;
 }
 
 body > .top > .files {
@@ -274,6 +274,87 @@ body > .top > .files > .file:last-child {
   margin-right: 0;
 }
 
+body > .file_data_list > .button.delete {
+  --hover_color: var(--red_hover);
+  --active_color: var(--red_active);
+
+  position: fixed;
+  width: 5vmin;
+  height: 5vmin;
+
+  padding: 1vmin;
+  border-bottom-left-radius: 1vmin;
+  border-bottom-right-radius: 1vmin;
+
+  background: var(--shade_1-0);
+
+  z-index: 4;
+
+  transition: all 250ms;
+}
+
+body > .file_data_list > .button.delete:not(:has(.confirm:hover)):hover {
+  background: var(--hover_color);
+
+  filter: brightness(1.2);
+}
+
+body > .file_data_list > .button.delete:not(:has(.confirm:hover:active)):hover:active {
+  background: var(--active_color);
+
+  filter: brightness(1.4);
+}
+
+body > .file_data_list > .button.delete.hide {
+  pointer-events: none;
+
+  opacity: 0;
+}
+
+body > .file_data_list > .button.delete:has(.confirm:not(.hide)) {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+body > .file_data_list > .button.delete > .confirm {
+  position: absolute;
+  left: 0;
+  top: 7vmin;
+  width: calc(100% - 2vmin);
+  height: calc(100% - 2vmin);
+
+  padding: 1vmin;
+  border-bottom-left-radius: 1vmin;
+  border-bottom-right-radius: 1vmin;
+
+  background: var(--red_background);
+
+  transition: left 500ms, top 250ms, width 500ms, height 500ms, opacity 500ms, transform 400ms, filter 250ms, padding 500ms;
+}
+
+body > .file_data_list > .button.delete > .confirm.hide {
+  pointer-events: none;
+
+  left: 50%;
+  top: 0;
+  width: 0;
+  height: 0;
+
+  padding: 0;
+
+  opacity: 0;
+
+  transform: translateY(2vmin);
+}
+
+body > .file_data_list > .button.delete > .confirm:hover {
+  filter: brightness(1.2);
+}
+
+body > .file_data_list > .button.delete > .confirm:hover:active {
+  filter: brightness(1.4);
+}
+
 body > .file_data_list > .file_data {
   display: inline-block;
 
@@ -284,6 +365,7 @@ body > .file_data_list > .file_data {
 
   padding: 1vmin;
   border-radius: 1vmin;
+  border-bottom-right-radius: 0;
 
   line-height: 2em;
   text-align: center;
@@ -292,7 +374,13 @@ body > .file_data_list > .file_data {
 
   background: var(--shade_0-2);
 
-  z-index: 3;
+  z-index: 4;
+}
+
+body > .file_data_list > .file_data.hide {
+  pointer-events: none;
+
+  opacity: 0;
 }
 
 body > .file_data_list > .file_data a {
@@ -324,7 +412,6 @@ body > .file_data_list > .file_data a:visited:active:hover {
 body > .file_data_list > .file_data > :is(.raw, .process) {
   display: inline-block;
 
-  padding: 1vmin;
   border-radius: 1vmin;
 
   line-height: 1em;
@@ -345,14 +432,27 @@ body > .file_data_list > .file_data > :is(.raw, .process).extension {
 }
 
 body > .file_data_list > .file_data > .raw {
+  padding: 1.5vmin;
+
   font-size: 1.2em;
 }
 
 body > .file_data_list > .file_data > .process {
+  padding: 1vmin;
   margin-top: 0.5vmin;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
 
   font-size: 0.9em;
   color: var(--subtitle_1);
+}
+
+body > .file_data_list > .file_data > .process.name {
+  border-top-right-radius: 0;
+}
+
+body > .file_data_list > .file_data > .process.extension {
+  border-top-left-radius: 0;
 }
 
 body > .file_data_list > .file_data > .title {
@@ -361,10 +461,9 @@ body > .file_data_list > .file_data > .title {
 }
 
 body > .file_data_list > .file_data > .metadata {
-  --columns: 20;
+  --columns: 1000;
 
   display: grid;
-  justify-content: center;
   grid-template-columns: repeat(var(--columns), 1fr);
 
   max-width: 50vw;
@@ -381,15 +480,17 @@ body > .file_data_list > .file_data > .metadata {
 body > .file_data_list > .file_data > .metadata > .datum {
   display: block;
 
-  width: calc(100% - 5vmin);
+  width: calc(100% - 4vmin);
+  height: 1em;
 
   margin: 0.5vmin;
-  padding: 2vmin;
+  padding: 1.5vmin;
   border-radius: 1vmin;
 
+  font-size: 0.9em;
   line-height: 1em;
   white-space: nowrap;
-  overflow: auto;
+  overflow: auto hidden;
 
   background: var(--shade_1-1);
 }
@@ -1083,11 +1184,11 @@ body > .side > .content > .groups > .group {
   z-index: 2;
 }
 
-body > .side > .content > .groups > .group > .content {
+body > .side > .content > .groups > .group {
   padding: 1vmin;
 }
 
-body > .side > .content > .groups > .group > .content > .name {
+body > .side > .content > .groups > .group > .name {
   outline: 0;
 
   text-align: center;
@@ -1096,15 +1197,15 @@ body > .side > .content > .groups > .group > .content > .name {
   white-space: nowrap;
 }
 
-body > .side > .content > .groups > .group > .content > .name:focus {
+body > .side > .content > .groups > .group > .name:focus {
   overflow: auto hidden;
 }
 
-body > .side > .content > .groups > .group > .content > .name:focus {
+body > .side > .content > .groups > .group > .name:focus {
   right: 0 !important;
 }
 
-body > .side > .content > .groups > .group > .content > :is(.edit, .format, .remove).button {
+body > .side > .content > .groups > .group > :is(.edit, .format, .remove).button {
   aspect-ratio: 1/1;
 
   position: absolute;
@@ -1120,19 +1221,19 @@ body > .side > .content > .groups > .group > .content > :is(.edit, .format, .rem
   transition: all 250ms;
 }
 
-body > .side > .content > .groups > .group > .content > :is(.edit, .format, .remove).button:hover {
+body > .side > .content > .groups > .group > :is(.edit, .format, .remove).button:hover {
   background: var(--hover_color);
 
   filter: brightness(1.2);
 }
 
-body > .side > .content > .groups > .group > .content > :is(.edit, .format, .remove).button:hover:active {
+body > .side > .content > .groups > .group > :is(.edit, .format, .remove).button:hover:active {
   background: var(--active_color);
 
   filter: brightness(1.4);
 }
 
-body > .side > .content > .groups > .group > .content > :is(.edit, .format, .remove).button.disabled {
+body > .side > .content > .groups > .group > :is(.edit, .format, .remove).button.disabled {
   pointer-events: none;
 
   background: transparent;
@@ -1140,7 +1241,7 @@ body > .side > .content > .groups > .group > .content > :is(.edit, .format, .rem
   filter: brightness(0.1);
 }
 
-body > .side > .content > .groups > .group > .content > :is(.edit, .format, .remove).button > svg {
+body > .side > .content > .groups > .group > :is(.edit, .format, .remove).button > svg {
   aspect-ratio: 1/1;
 
   position: relative;
@@ -1148,7 +1249,7 @@ body > .side > .content > .groups > .group > .content > :is(.edit, .format, .rem
   height: 75%;
 }
 
-body > .side > .content > .groups > .group > .content > .edit.button {
+body > .side > .content > .groups > .group > .edit.button {
   --hover_color: var(--blue_hover);
   --active_color: var(--blue_active);
 
@@ -1158,7 +1259,7 @@ body > .side > .content > .groups > .group > .content > .edit.button {
   border-bottom-right-radius: 10%;
 }
 
-body > .side > .content > .groups > .group > .content > .format.button {
+body > .side > .content > .groups > .group > .format.button {
   --hover_color: var(--yellow_hover);
   --active_color: var(--yellow_active);
 
@@ -1168,14 +1269,14 @@ body > .side > .content > .groups > .group > .content > .format.button {
   border-bottom-left-radius: 10%;
 }
 
-body > .side > .content > .groups > .group > .content > .remove.button {
+body > .side > .content > .groups > .group > .remove.button {
   --hover_color: var(--red_hover);
   --active_color: var(--red_active);
 
   right: 2vmin;
 }
 
-body > .side > .content > .groups > .group > .content > .data {
+body > .side > .content > .groups > .group > .data {
   position: relative;
   left: 1vmin;
   width: calc(var(--side_width) - 4vmin);
@@ -1183,8 +1284,8 @@ body > .side > .content > .groups > .group > .content > .data {
   margin-bottom: 0.5vmin;
 }
 
-body > .side > .content > .groups > .group > .content > .data:before,
-body > .side > .content > .groups > .group > .content > .data:after {
+body > .side > .content > .groups > .group > .data:before,
+body > .side > .content > .groups > .group > .data:after {
   content: '';
 
   pointer-events: none;
@@ -1199,23 +1300,23 @@ body > .side > .content > .groups > .group > .content > .data:after {
   z-index: 1;
 }
 
-body > .side > .content > .groups > .group > .content > .data:before {
+body > .side > .content > .groups > .group > .data:before {
   left: 0;
 
   background-image: linear-gradient(to left, transparent, var(--shade_1-2) 90%);
 }
 
-body > .side > .content > .groups > .group > .content > .data:after {
+body > .side > .content > .groups > .group > .data:after {
   right: calc(10vmin + 2em);
 
   background-image: linear-gradient(to right, transparent, var(--shade_1-2) 90%);
 }
 
-body > .side > .content > .groups > .group > .content > .data:last-child {
+body > .side > .content > .groups > .group > .data:last-child {
   margin-bottom: calc(calc(var(--side_width) - 2vmin) / 10 + 3vmin);
 }
 
-body > .side > .content > .groups > .group > .content > .data > .content {
+body > .side > .content > .groups > .group > .data > .content {
   display: inline-block;
 
   width: calc(100% - 10vmin - 2em);
@@ -1235,22 +1336,22 @@ body > .side > .content > .groups > .group > .content > .data > .content {
   transition: all 250ms;
 }
 
-body > .side > .content > .groups > .group > .content > .data > .content:hover {
+body > .side > .content > .groups > .group > .data > .content:hover {
   filter: brightness(1.2);
 }
 
-body > .side > .content > .groups > .group > .content > .data > .content:hover:active {
+body > .side > .content > .groups > .group > .data > .content:hover:active {
   filter: brightness(1.4);
 }
 
-body > .side > .content > .groups > .group > .content > .data > .content > .tab {
+body > .side > .content > .groups > .group > .data > .content > .tab {
   display: inline-block;
 
   width: 2ch;
   height: 1px;
 }
 
-body > .side > .content > .groups > .group > .content > .data > .content > :is(.strand, .type, .file) {
+body > .side > .content > .groups > .group > .data > .content > :is(.strand, .type, .file) {
   --length: 1;
 
   display: inline-block;
@@ -1271,7 +1372,7 @@ body > .side > .content > .groups > .group > .content > .data > .content > :is(.
   background: linear-gradient(45deg, var(--shade_2-0), var(--shade_3-0));
 }
 
-body > .side > .content > .groups > .group > .content > .data > :is(.copy, .paste).button {
+body > .side > .content > .groups > .group > .data > :is(.copy, .paste).button {
   aspect-ratio: 1/1;
   display: block;
 
@@ -1288,19 +1389,19 @@ body > .side > .content > .groups > .group > .content > .data > :is(.copy, .past
   transition: all 250ms;
 }
 
-body > .side > .content > .groups > .group > .content > .data > :is(.copy, .paste).button:hover {
+body > .side > .content > .groups > .group > .data > :is(.copy, .paste).button:hover {
   background: var(--hover_color);
 
   filter: brightness(1.2);
 }
 
-body > .side > .content > .groups > .group > .content > .data > :is(.copy, .paste).button:hover:active {
+body > .side > .content > .groups > .group > .data > :is(.copy, .paste).button:hover:active {
   background: var(--active_color);
 
   filter: brightness(1.4);
 }
 
-body > .side > .content > .groups > .group > .content > .data > :is(.copy, .paste).button > svg {
+body > .side > .content > .groups > .group > .data > :is(.copy, .paste).button > svg {
   aspect-ratio: 1/1;
 
   position: relative;
@@ -1308,19 +1409,19 @@ body > .side > .content > .groups > .group > .content > .data > :is(.copy, .past
   height: 75%;
 }
 
-body > .side > .content > .groups > .group > .content > .data > .copy.button {
+body > .side > .content > .groups > .group > .data > .copy.button {
   --hover_color: var(--blue_hover);
   --active_color: var(--blue_active);
 
   margin-right: 1vmin;
 }
 
-body > .side > .content > .groups > .group > .content > .data > .paste.button {
+body > .side > .content > .groups > .group > .data > .paste.button {
   --hover_color: var(--yellow_hover);
   --active_color: var(--yellow_active);
 }
 
-body > .side > .content > .groups > .group > .content > .data > .paste.button.disabled {
+body > .side > .content > .groups > .group > .data > .paste.button.disabled {
   pointer-events: none;
 
   background: transparent;

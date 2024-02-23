@@ -57,6 +57,13 @@
       <div class='import button'>
         <insert type='dictionary/html' src='../../global/html/icons.ejs' key='import,x'></insert>
       </div>
+      <div class='import types hide' events='import_types'>
+        <div class='button extension selected' extension='image/png' radio-group='export_extension' events='radio'>PNG</div>
+        <div class='button extension' extension='image/jpeg' radio-group='export_extension' events='radio'>JPG</div>
+        <div class='button extension' extension='image/webp' radio-group='export_extension' events='radio'>WEBP</div>
+        <div class='button extension' extension='image/svg+xml' radio-group='export_extension' events='radio'>SVG</div>
+      </div>
+
       <div class='delete_data button disabled' events='delete_data'>
         <insert type='dictionary/html' src='../../global/html/icons.ejs' key='trash,x'></insert>
         <br/>
@@ -72,6 +79,7 @@
       <div class='draw button disabled' events='draw'>
         <insert type='dictionary/html' src='../../global/html/icons.ejs' key='draw,x'></insert>
       </div>
+
       <div class='export button disabled' events='export'>
         <insert type='dictionary/html' src='../../global/html/icons.ejs' key='export,x'></insert>
       </div>
@@ -90,15 +98,22 @@
     </div>
 
     <div class='file_data_list'>
-      <div class='file_data template'>
+      <div class='file_data template hide'>
         <span class='raw name select'>&lt;Raw Name&gt;</span><span class='raw extension select'>.ext</span><br/>
         <span class='process name select'>&lt;Process Name&gt;</span><span class='process extension select'>.ext</span><br/>
         <h4 class='title'>Metadata</h4>
         <div class='metadata'>
           <span class='datum auto_scroll select hide template'>
-            &lpar;<span class='label'></span>&rpar;<span class='value'></span>
+            &lpar;<span class='label select'></span>&rpar;<span class='value select'></span>
           </span>
         </div>
+      </div>
+      <div class='button delete hide' events='delete_file_data'>
+        <insert type='dictionary/html' src='../../global/html/icons.ejs' key='trash'></insert>
+        <br/>
+        <span class='confirm hide' events='delete_file_data_confirm'>
+          <insert type='dictionary/html' src='../../global/html/icons.ejs' key='trash_confirm'></insert>
+        </span>
       </div>
     </div>
 
@@ -260,10 +275,6 @@
         </div>
         <div class='groups section' events='groups'>
           <div class='group template' group-index='?'>
-            <div class='backdrop main'></div>
-            <div class='backdrop circle upper'></div>
-            <div class='backdrop circle lower'></div>
-            <div class='content' events='group'>
               <p class='name auto_scroll select' contenteditable spellcheck='false' events='group_name' hide-sidebars='true'>Group &lt;#&gt;</p>
 
               <div class='data template'>
@@ -271,7 +282,7 @@
                   <span class='tab'></span>
                   <span class='strand'></span>
                   <span class='type'></span>
-                  <span class='file'></span>
+                  <span class='file' events='group_data_file'></span>
                   <span class='tab'></span>
                 </span>
                 <div class='paste button disabled' events='group_data_paste'>
@@ -291,7 +302,6 @@
               <div class='remove button' events='group_remove'>
                 <insert type='dictionary/html' src='../../global/html/icons.ejs' key='minus'></insert>
               </div>
-            </div>
           </div>
         </div>
       </div>

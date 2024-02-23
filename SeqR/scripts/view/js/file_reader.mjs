@@ -228,30 +228,35 @@ async function FileReader(e) {
     const file = fileSaveNames.last();
     const metaDataI = metadataLocations[file.name]++;
 
-    metadataParser.push(new Promise(async r => {
+    metadataParser.push(new Promise(async resolve => {
       const octothorpes = line.match(/^#*/)[0];
       line = line.slice(octothorpes.length).split(/\s/);
 
       const segments = [];
       const segmentPromises = [];
       for (const segment of line)
-        segmentPromises.push(new Promise(async r => {
+        segmentPromises.push(new Promise(async segmentResolve => {
           try {
-            const url = new URL(segment).href; // make sure it's a valid url before wasting resources on it
+            const url = new URL(segment); // make sure it's a valid url before wasting resources on it
             const obj = {
               type: 'link',
-              link: segment,
+              link: url.href,
             };
 
             try {
-              obj.text = (await timedFetch(`https://corsproxy.io/?${encodeURIComponent(url)}`, {}, 1000).then(res =>
-                res.text()
-              )).match(/<title>(.*)<\/title>/)[1];
+              obj.text = await timedFetch(
+                `https://corsproxy.io/?${encodeURIComponent(url.href)}`, {},
+                1000
+              ).then(res => res.text()).then(text =>
+                text.match(/<title>(.*)<\/title>/)[1]
+              ).catch(() =>
+                `${url.hostname}${url.pathname}`.replace(/(^www\.|\/$)/g, '')
+              );
             } finally {
-              r(obj);
+              segmentResolve(obj);
             }
           } catch (err) {
-            r(segment);
+            segmentResolve(segment);
           }
         }).then(v => segments.push(v)));
 
@@ -271,7 +276,7 @@ async function FileReader(e) {
         label: octothorpes,
       };
 
-      r('done');
+      resolve('done');
     }));
   }
 

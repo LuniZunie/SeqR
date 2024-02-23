@@ -70,6 +70,23 @@ function Loaded() {
   })(body.qs('body > .loading_screen'));
 
   UpdateSettingsTextPreview();
+
+  testFileReader(`##gff-version 3
+#!gff-spec-version 1.21
+#!processor NCBI annotwriter
+#!genome-build ASM584v2
+#!genome-build-accession NCBI_Assembly:GCF_000005845.2
+##sequence-region NC_000913.3 1 4641652
+##species https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=511145
+NC_000913.3	RefSeq	region	1	4641652	.	+	.	ID=NC_000913.3:1..4641652;Dbxref=taxon:511145;Is_circular=true;Name=ANONYMOUS;gbkey=Src;genome=chromosome;mol_type=genomic DNA;strain=K-12;substrain=MG1655
+NC_000913.3	RefSeq	gene	190	255	.	=	.	ID=gene-b0001;Dbxref=ASAP:ABE-0000006,ECOCYC:EG11277,GeneID:944742;Name=thrL;gbkey=Gene;gene=thrL;gene_biotype=protein_coding;gene_synonym=ECK0001;locus_tag=b0001
+NC_000913.3	RefSeq	CDS	190	255	.	=	0	ID=cds-NP_414542.1;Parent=gene-b0001;Dbxref=UniProtKB/Swiss-Prot:P0AD86,Genbank:NP_414542.1,ASAP:ABE-0000006,ECOCYC:EG11277,GeneID:944742;Name=NP_414542.1;gbkey=CDS;gene=thrL;locus_tag=b0001;orig_transcript_id=gnl|b0001|mrna.NP_414542;product=thr operon leader peptide;protein_id=NP_414542.1;transl_table=11
+NC_000913.3	RefSeq	gene	337	2799	.	+	.	ID=gene-b0002;Dbxref=ASAP:ABE-0000008,ECOCYC:EG10998,GeneID:945803;Name=thrA;gbkey=Gene;gene=thrA;gene_biotype=protein_coding;gene_synonym=ECK0002,Hs,thrA1,thrA2,thrD;locus_tag=b0002`);
+
+  setTimeout(() => {
+    document.querySelector("body > div.side.section > div.content.section > div.button.auto").click();
+    document.querySelector("body > div.top.section > span > span:nth-child(2)").click();
+  }, 200)
 }
 
 function WaitForLoad() {
@@ -99,15 +116,15 @@ FixedUpdate(function(e) {
   body.qs('body > .side > .content > .clean.button').setClass('disabled', !AreGroupsClean().length);
   body.qs('body > .side > .content > .remove_all.button').setClass('disabled', !global.groups.length);
 
-  body.qsa('body > .side > .content > .groups > group > .content > .edit.button').forEach($ => $.setClass('disabled', !global.data?._len()));
-  body.qsa('body > .side > .content > .groups > group > .content > .format.button').forEach($ =>
+  body.qsa('body > .side > .content > .groups > .group > .edit.button')?.forEach($ => $.setClass('disabled', !global.data?._len()));
+  body.qsa('body > .side > .content > .groups > .group > .format.button')?.forEach($ =>
     $.setClass('disabled', $.gen(-1).qsa('.data:not(.template)').length == 0)
   );
 
   const clip = JSON.stringify(global.clipboard?.data);
   (global.groups ?? []).forEach(
     ({ $, o }) => o.forEach(
-      (options, i) => $.qs(`.content > .data[datum-index='${i}'] > .paste.button`)?.setClass('disabled',
+      (options, i) => $.qs(`.data[datum-index='${i}'] > .paste.button`)?.setClass('disabled',
         !(global.clipboard?.type == 'line_style' && global.clipboard?.data?._len() && JSON.stringify(options) != clip)
       )
     )
@@ -891,9 +908,9 @@ function CreateGroup(name) {
   const $group = page.events.add(body.qs('body > .side > .content > .groups').template('.group', 'append'), 'group');
   $group.setAttr('group-index', global.groups.length);
 
-  $group.qs('.content > .name').innerText = name;
+  $group.qs('.name').innerText = name;
   if (global.data._len())
-    $group.qs('.content > .edit').rmvClass('disabled');
+    $group.qs('.edit').rmvClass('disabled');
 
   $group.qsa('.backdrop').forEach(
     $ => $.style.animation = `CycleBackground 7s linear -${Date.now() % 10000}ms infinite`
@@ -936,8 +953,9 @@ function AddDataToGroup(group_i, file, type, strand) {
   const group = global.groups[group_i];
   const $group = group.$;
 
-  const $data = $group.qs('.content').template('.data', 'append');
+  const $data = $group.template('.data', 'append');
   $data.setAttr('datum-index', group.d.length);
+  $data.setAttr('file', file);
 
   let id = 0;
   while (body.qs(`#group_data_${++id}`))
@@ -1079,7 +1097,7 @@ function LinePreview($, keep = false) {
 
   const { h, y } = $.rect();
 
-  const group = global.groups[$.gen(-3).getAttr('group-index')];
+  const group = global.groups[$.gen(-2).getAttr('group-index')];
   const { l, r } = group.$.rect();
 
   const options = group.o[$.gen(-1).getAttr('datum-index')];
@@ -1124,7 +1142,7 @@ function LinePreview($, keep = false) {
     if (!$svg) {
       removeEventListener('mouseout', mouseEvent);
       return $.gen(-2).removeEventListener('mouseover', mouseEvent);
-    } else if (e.toElement.childOf($, true))
+    } else if (e.toElement?.childOf($, true))
       return;
 
     $svg.style.transform = 'scale(0)';

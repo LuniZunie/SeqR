@@ -705,9 +705,35 @@ function parseTransition($) {
   );
 }
 
-function timedFetch(url, options, timeout = 10000) {
+function timedFetch(...args) {
+  if (!((args.length - 1) % 2 == 0 && args.length > 2))
+    throw new Error('Invalid number of arguments');
+
+  const timeout = args.pop();
+  const fetches = args.reduce((fetches, arg, i) => {
+    if (i % 2 == 0)
+      fetches.push([ arg ]); // url
+    else
+      fetches[fetches.length - 1].push(arg); // options
+
+    return fetches;
+  }, []);
+
+  let invalidFetches = 0;
   return Promise.race([
-    fetch(url, options),
+    ...fetches.map(([ url, options ]) => {
+      return new Promise((resolve, reject) => {
+        fetch(url, options).then(res => {
+          if (res.ok)
+            resolve(res);
+          else if (++invalidFetches == fetches.length)
+            reject(new Error('all fetches failed'));
+        }).catch(() => {
+          if (++invalidFetches == fetches.length)
+            reject(new Error('all fetches failed'));
+        });
+      });
+    }),
     new Promise((_, reject) =>
       setTimeout(() => reject(new Error('timeout')), timeout)
     ),

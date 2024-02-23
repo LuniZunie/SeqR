@@ -490,9 +490,9 @@ notification.error {
   overflow: auto;
 
   padding: 0.5vmin;
-  border: 2px solid var(--shade_3-0);
+  border: 2px solid var(--shade_2-2);
 
-  background: var(--shade_1-0);
+  background: var(--shade_0-2);
 }
 
 .template {

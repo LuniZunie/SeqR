@@ -84,7 +84,7 @@ page.events = new Events({
           () => DeleteFixedUpdate(id)
         ),
         body.qs( // time
-          'body > .side > .content > .groups > .group:not(.template) > .content > .data:not(.template) > .content'
+          'body > .side > .content > .groups > .group:not(.template) > .data:not(.template) > .content'
         )?.gen(-Infinity, 0).flat(Infinity).map(
           $ => $ instanceof Element ? parseTransition($).max() : 0
         ).max() ?? 0
@@ -97,9 +97,13 @@ page.events = new Events({
             { selector: 'body > .top > .delete_data.button > .confirm', hideOnClick: true },
             { selector: 'body > .top > .export.extensions' },
             { selector: 'body > .top > .export.name' },
+            { selector: 'body > .file_data_list > .delete.button > .confirm', hideOnClick: true },
             { selector: 'body > .data_select', includeSelf: true },
             { selector: 'body > .line_settings:not(.hide)', extra: 'line_setttings' },
-            { selector: 'body > .cover', checks: [ 'body > .data_select', 'body > .line_settings:not(.hide)', { selector: 'body > .settings', hide: true } ], hideOnClick: true, capture: true },
+            { selector: 'body > .cover', checks: [
+              'body > .data_select', 'body > .line_settings:not(.hide)',
+              { selector: 'body > .settings', hide: true },
+            ], hideOnClick: true, capture: true },
           ].forEach(
             ({ selector, $class, checks, hideOnClick, includeSelf, capture, extra }) => (function($) {
               $class ??= 'hide';
@@ -210,6 +214,8 @@ page.events = new Events({
   },
   file: {
     click: function(e) {
+      body.qsa('body > .file_data_list > .file_data:not(.template)')?.memRmv();
+
       const $ = this;
       (function($fileData) {
         $fileData.qs('.raw.name').innerText = $.getAttr('raw-name');
@@ -219,8 +225,6 @@ page.events = new Events({
         $fileData.qs('.process.extension').innerText = $.getAttr('process-extension');
 
         (function($metadata) {
-          let maxMetadataWidth = -Infinity;
-
           const gridColums = +$metadata.getCS('--columns');
           JSON.parse($.getAttr('metadata')).map(
             datum => (function ($datum) {
@@ -237,23 +241,18 @@ page.events = new Events({
                           $a.innerText = v.text ?? v.link;
                           $a.href = v.link;
                           $a.target = '_blank';
-                        })($value.appendChild('a'));
+                        })($value.appendChild('a.select'));
                         break;
                       } default:
                         break;
                     }
                   else
-                    $value.appendChild('span').innerText = v;
-
-                  if (i < datum.length - 1)
-                    $value.appendChild('span').innerText = ' ';
+                    $value.appendChild('span.select').innerText = v;
                 });
               })($datum.qs('.value'));
 
-              const span = ($datum.scrollWidth / $datum.clientWidth).ceil(2).clamp(1, gridColums);
+              const span = ($datum.scrollWidth * gridColums / ($metadata.clientWidth - vmin(2)) + 1).ceil(2).clamp(1, gridColums); // 2vmin padding (1vmin on each side)
               $datum.style.gridColumn = `auto / span ${span}`;
-
-              maxMetadataWidth = Math.max(maxMetadataWidth, $datum.scrollWidth);
 
               return span;
             })($metadata.template('.datum', 'append'))
@@ -266,35 +265,107 @@ page.events = new Events({
 
             return rows;
           }, [[]]).reduce((i, row) => {
-            const span = (gridColums - row.sum()) / 2;
-            if (span == 0)
-              return i += row.length;
+            const emptySpan = (gridColums - row.sum()) / 2; // / row.length;
+            if (emptySpan == 0)
+              return i + row.length;
+
+            /* row.forEach(span =>
+              $metadata.qs(`.datum:nth-of-type(${i++ + 1})`).style.gridColumn = `auto / span ${Math.round(span + emptySpan)}`
+            ); */
 
             $metadata.prependChild('div.centerer', $metadata.qs(`.datum:nth-of-type(${i + 1})`)).setCSS({
-              'grid-column': `auto / span ${span}`,
+              'grid-column': `auto / span ${emptySpan}`,
               'width': '100%',
             });
 
             i += row.length;
 
             $metadata.appendChild('div.centerer', $metadata.qs(`.datum:nth-of-type(${i})`)).setCSS({
-              'grid-column': `auto / span ${span}`,
+              'grid-column': `auto / span ${emptySpan}`,
               'width': '100%',
             });
 
             return i;
           }, 1);
-
-          $metadata.style.setProperty('--text-width', `${Math.max(
-            $fileData.qs('.raw.name').scrollWidth + $fileData.qs('.raw.extension').scrollWidth + vmin(0.5),
-            $fileData.qs('.process.name').scrollWidth + $fileData.qs('.process.extension').scrollWidth + vmin(0.5),
-            maxMetadataWidth + vmin(2)
-          )}px`);
         })($fileData.qs('.metadata'))
 
-        $fileData.style.left = `${$fileData.rect().x - $fileData.rect().w / 2}px`;
-        $fileData.style.top = `${$fileData.rect().y - $fileData.rect().h / 2}px`;
+        $fileData.style.left = `${($fileData.rect().x - $fileData.rect().w / 2).round(2)}px`;
+        $fileData.style.top = `${($fileData.rect().y - $fileData.rect().h / 2).round(2)}px`;
+
+        (function($delete) {
+          $delete.setAttr('file', $.getAttr('raw-name'));
+
+          $delete.style.left = `${$fileData.rect().x + $fileData.rect().w - $delete.rect().w}px`;
+          $delete.style.top = `${$fileData.rect().y + $fileData.rect().h}px`;
+          $delete.rmvClass('hide');
+        })(body.qs('body > .file_data_list > .button.delete'));
+
+        $fileData.style.transition = 'all 250ms';
+        $fileData.rmvClass('hide');
       })(body.qs('body > .file_data_list').template('.file_data', 'append'));
+
+      const $cover = body.appendChild('div.cover.hide.file_data');
+      $cover.rmvClass('hide');
+
+      $cover.addEventListener('click', function(e) {
+        $cover.addClass('hide');
+        setTimeout(() => $cover.memRmv(), parseTransition($cover).max());
+
+        (function($fileData) {
+          $fileData.addClass('hide');
+          setTimeout(() => $fileData.memRmv(), parseTransition($fileData).max());
+        })(body.qs('body > .file_data_list > .file_data:not(.template)'));
+
+        body.qs('body > .file_data_list > .button.delete').addClass('hide');
+      });
+    },
+  },
+  delete_file_data: {
+    mouseenter: function(e) {
+      if (!this.qs('.confirm').hasClass('hide'))
+        return;
+
+      new Tooltip('div.tooltip.helptip', body, tips.help.content.file_data.delete_file_data)
+        .setOrigin('center', 'top')
+        .newAnchor('center', 'bottom', this)
+          .setDestructionEvents({
+            'mouseleave': null,
+            'click': null,
+          }, 250)
+          .tooltip
+        .requestOffset(0, 5)
+        .setBoundingBox('left', 'top', 'right', 'bottom')
+        .moveAbove(this)
+        .create(500, 500);
+    },
+    click: function(e) {
+      this.qs('.confirm').rmvClass('hide');
+    },
+  },
+  delete_file_data_confirm: {
+    mouseenter: function(e) {
+      new Tooltip('div.tooltip.helptip.confirm_delete_file_data', body, tips.help.content.file_data.confirm_delete_file_data)
+        .setOrigin('center', 'top')
+        .newAnchor('center', 'bottom', this)
+          .setDestructionEvents({
+            'mouseleave': null,
+            'click': null,
+          }, 250)
+          .tooltip
+        .requestOffset(0, 5)
+        .setBoundingBox('left', 'top', 'right', 'bottom')
+        .moveAbove(this)
+        .create(500, 500);
+    },
+    click: function(e) {
+      body.qs('body > .cover.file_data').click();
+
+      (function(file) {
+        delete global.data[file];
+        body.qs(`body > .top > .files > .file[raw-name='${file}']`)?.memRmv();
+      })(this.gen(-1).getAttr('file'));
+
+      body.qs('body > .side > .content > .auto.button')?.click();
     },
   },
   delete_data: {
@@ -348,7 +419,7 @@ page.events = new Events({
       global.groups = [];
 
       global.colors = {
-        strands: {},
+        cache: {},
         taken: [
           [ 255, 0, 0, 255 ],
           [ 0, 255, 0, 255 ],
@@ -365,7 +436,7 @@ page.events = new Events({
   },
   groups: {
     wheel: function(e) {
-      if (this.qsa('.group:not(.template) > .content > .data:not(.template) > .content[over="true"]').some($ => $.clientWidth < $.scrollWidth))
+      if (this.qsa('.group:not(.template) > .data:not(.template) > .content[over="true"]').some($ => $.clientWidth < $.scrollWidth))
         e.preventDefault();
     },
   },
@@ -494,7 +565,7 @@ page.events = new Events({
         .create(500, 500);
     },
     input: function(e) {
-      global.groups[this.gen(-2).getAttr('group-index')].n = this.innerHTML;
+      global.groups[this.gen(-1).getAttr('group-index')].n = this.innerHTML;
     },
   },
   group_edit: {
@@ -534,7 +605,7 @@ page.events = new Events({
         );
       }
 
-      const i_group = this.gen(-2).getAttr('group-index');
+      const i_group = this.gen(-1).getAttr('group-index');
       const group = global.groups[i_group];
 
       const $dataSelect = body.qs('body > .data_select > .content');
@@ -609,6 +680,8 @@ page.events = new Events({
         const i_data = global.groups[i_group].d.findIndex(datum => datum.f == file && datum.t == type && datum.s == strand);
         global.groups[i_group].d.splice(i_data, 1)[0].$.memRmv();
         global.groups[i_group].o.splice(i_data, 1);
+
+        global.groups[i_group].$.qsa('.data:not(.template)')?.forEach(($, i) => $.setAttr('datum-index', i));
       }
     }
   },
@@ -649,7 +722,7 @@ page.events = new Events({
       events.add(body.qs('body > iframe.line_settings'), 'line_settings.load[1]');
       $lineSettings.rmvClass('hide');
 
-      $lineSettings.setAttr('group-index', this.gen(-3).getAttr('group-index'));
+      $lineSettings.setAttr('group-index', this.gen(-2).getAttr('group-index'));
       $lineSettings.setAttr('datum-index', this.gen(-1).getAttr('datum-index'));
 
       $lineSettings.src = '../../line_settings/html';
@@ -667,7 +740,7 @@ page.events = new Events({
   },
   group_data_file: {
     mouseenter: function(e) {
-      new Tooltip('div.tooltip.helptip', body, this.getAttr('file'))
+      new Tooltip('div.tooltip.helptip', body, this.gen(-2).getAttr('file'))
         .setOrigin('center', 'top')
         .newAnchor('center', 'bottom', this)
           .setDestructionEvents({
@@ -731,7 +804,7 @@ page.events = new Events({
         .create(500, 500);
     },
     click: function(e) {
-      const i_group = +this.gen(-3).getAttr('group-index');
+      const i_group = +this.gen(-2).getAttr('group-index');
       const i_data = +this.gen(-1).getAttr('datum-index');
 
       global.clipboard = { type: 'line_style', data: structuredClone(global.groups[i_group].o[i_data]) };
@@ -763,7 +836,7 @@ page.events = new Events({
         .create(500, 500);
     },
     click: function(e) {
-      const i_group = +this.gen(-3).getAttr('group-index');
+      const i_group = +this.gen(-2).getAttr('group-index');
       const i_data = +this.gen(-1).getAttr('datum-index');
 
       global.groups[i_group].o[i_data] = structuredClone(global.clipboard.data);
@@ -799,7 +872,7 @@ page.events = new Events({
       events.add(body.qs('body > iframe.line_settings'), 'line_settings.load[0]');
       $lineSettings.rmvClass('hide');
 
-      $lineSettings.setAttr('group-index', this.gen(-2).getAttr('group-index'));
+      $lineSettings.setAttr('group-index', this.gen(-1).getAttr('group-index'));
 
       $lineSettings.src = '../../line_settings/html';
 
@@ -822,7 +895,7 @@ page.events = new Events({
         .create(500, 500);
     },
     click: function(e) {
-      const { $ } = global.groups.splice(this.gen(-2).getAttr('group-index'), 1)[0];
+      const { $ } = global.groups.splice(this.gen(-1).getAttr('group-index'), 1)[0];
       $.memRmv();
       global.groups.forEach(
         ({ $ }, i) => $.setAttr('group-index', i)
@@ -894,7 +967,7 @@ page.events = new Events({
               $padding.qs(`.page > .content > .option.${k} > input`).value = v ?? ''
             );
             global.draw.padding.group._forEach(([ k, v ]) =>
-              $padding.qs(`.group > .content > .option.${k} > input`).value = v ?? ''
+              $padding.qs(`.group > .option.${k} > input`).value = v ?? ''
             );
           })($settings.qs('.padding'));
 
@@ -1072,7 +1145,7 @@ page.events = new Events({
             ),
             group: Object.assign(
               { top: 0, right: 0, bottom: 0, left: 0 },
-              Object.fromEntries($settings.qsa('.padding > .group > .content > .option > input').map($ =>
+              Object.fromEntries($settings.qsa('.padding > .group > .option > input').map($ =>
                 [ $.id.replace('settings_padding_group_', ''), settingify((+$.value).clamp(0)) ]
               ))
             ),

@@ -26,5 +26,11 @@ export default {
         }
       }
     },
+    content: {
+      file_data: {
+        delete_file_data: 'Delete file data',
+        confirm_delete_file_data: 'Confirm you want to delete file data',
+      },
+    },
   },
 };

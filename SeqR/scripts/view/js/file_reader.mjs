@@ -32,7 +32,7 @@ export {
   readFLSsByKey,
   readFLSsByKey_short,
   FileReader,
-  testFileReader,
+  LoadFileFromText,
 };
 
 const extensions = {
@@ -186,9 +186,9 @@ const { readFLSsByKey, readFLSsByKey_short } = (function(func) {
   }, { accepted: [], rejected: [] });
 });
 
-function testFileReader(str, extension = 'gff') {
+function LoadFileFromText(str, fileName) {
   const file = new Blob([ str ], { type: 'text/plain' });
-  file.name = `test.${extension}`;
+  file.name = fileName;
 
   FileReader({ files: [ file ] });
 }
@@ -224,13 +224,12 @@ async function FileReader(e) {
 
   const metadataParser = [];
   const metadataLocations = {};
-  function MetaDataHandler(line) {
+  function MetaDataHandler(line, label) {
     const file = fileSaveNames.last();
     const metaDataI = metadataLocations[file.name]++;
 
     metadataParser.push(new Promise(async resolve => {
-      const octothorpes = line.match(/^#*/)[0];
-      line = line.slice(octothorpes.length).split(/\s/);
+      line = line.slice(label.length).split(/\s/);
 
       const segments = [];
       const segmentPromises = [];
@@ -273,7 +272,7 @@ async function FileReader(e) {
                 return arr.slice(0, last).concat(`${arr[last]} ${v}`);
             })(arr.length - 1), []
         ).filter(v => v != ''),
-        label: octothorpes,
+        label,
       };
 
       resolve('done');
@@ -293,7 +292,10 @@ async function FileReader(e) {
                 group,
                 v.reduce((sum, { v, l: length }) => [
                   `${sum[0]}\n${writeFLS_short(v)}`,
-                  [ min(sum[1][0], v.s), max(sum[1][1], v.e) ],
+                  [
+                    Math.min(sum[1][0], v.s),
+                    Math.max(sum[1][1], v.e)
+                  ],
                   sum[2] + length
                 ], [ '', [ Infinity, -Infinity ], 0 ])
               ])._sort(([ , v_a ], [ , v_b ]) =>
@@ -326,11 +328,14 @@ async function FileReader(e) {
 
       ++lineNum;
       if (line[0] == '#') { // comment defintions should only be at the start of the line
-        MetaDataHandler(line);
+        MetaDataHandler(line, line.match(/^#*/)[0]);
 
         return clearCache();
-      } else if (line.startsWith('browser') || line.startsWith('track'))
+      } else if (line.startsWith('browser') || line.startsWith('track')) {
+        MetaDataHandler(line, line.match(/^(browser|track)/)[0]);
+
         return clearCache();
+      }
 
       let [ seqid, source, type, start, end, score, strand, phase, ...group ] = line.split(lineSplitRegExps.gff);
       if (group.length > 1 || !phase)
@@ -380,8 +385,8 @@ async function FileReader(e) {
               v.reduce((sum, { v, l: length }) => [
                 `${sum[0]}\n${writeFLS_short(v)}`,
                 [
-                  min(sum[1][0], v.s),
-                  max(sum[1][1], v.e)
+                  Math.min(sum[1][0], v.s),
+                  Math.max(sum[1][1], v.e)
                 ],
                 sum[2] + length
               ], [ '', [ Infinity, -Infinity ], 0 ])
@@ -410,11 +415,14 @@ async function FileReader(e) {
 
       ++lineNum;
       if (line[0] == '#') { // comment defintions should only be at the start of the line
-        MetaDataHandler(line);
+        MetaDataHandler(line, line.match(/^#*/)[0]);
 
         return clearCache();
-      } else if (line.startsWith('browser') || line.startsWith('track'))
+      } else if (line.startsWith('browser') || line.startsWith('track')) {
+        MetaDataHandler(line, line.match(/^(browser|track)/)[0]);
+
         return clearCache();
+      }
 
       let [ seqid, source, type, start, end, score, strand, phase, ...attrs ] = line.split(lineSplitRegExps.gff3);
       if (attrs.length > 1 || !phase)
@@ -476,8 +484,8 @@ async function FileReader(e) {
               v.reduce((sum, { v, l: length }) => [
                 `${sum[0]}\n${writeFLS_short(v)}`,
                 [
-                  min(sum[1][0], v.s),
-                  max(sum[1][1], v.e)
+                  Math.min(sum[1][0], v.s),
+                  Math.max(sum[1][1], v.e)
                 ],
                 sum[2] + length
               ], [ '', [ Infinity, -Infinity ], 0 ])
@@ -506,11 +514,14 @@ async function FileReader(e) {
 
       ++lineNum;
       if (line[0] == '#') { // comment defintions should only be at the start of the line
-        MetaDataHandler(line);
+        MetaDataHandler(line, line.match(/^#*/)[0]);
 
         return clearCache();
-      } else if (line.startsWith('browser') || line.startsWith('track'))
+      } else if (line.startsWith('browser') || line.startsWith('track')) {
+        MetaDataHandler(line, line.match(/^(browser|track)/)[0]);
+
         return clearCache();
+      }
 
       let [ chrom, start, end, name, score, strand, thickStart, thickEnd, rgb, blockCount, blockSizes, blockStarts ] = line.split(lineSplitRegExps.bed);
       if (!chrom || !start || !end)
@@ -566,7 +577,7 @@ async function FileReader(e) {
             let poses = [ [], [] ];
             for (const v of vs) {
               const url = `blob:${v.u}`;
-              range = [ min(range[0], v.r[0]), max(range[1], v.r[1]) ];
+              range = [ Math.min(range[0], v.r[0]), Math.max(range[1], v.r[1]) ];
 
               let fullChunk = '';
               const decoder = new TextDecoder();
@@ -579,7 +590,7 @@ async function FileReader(e) {
                     const { line: lineNumber, starts, ends } = readFLS(line);
 
                     return {
-                      minLine: min(minLine, lineNumber),
+                      minLine: Math.min(minLine, lineNumber),
                       poses: [ allStarts.concat(starts.map(v => +v)), allEnds.concat(ends.map(v => +v)) ]
                     }
                   }, { minLine, poses });
@@ -668,6 +679,13 @@ async function FileReader(e) {
 
       //const simplify = ([ k, v ]) => [ k, v.o?._$map(simplify) ];
 
+      //console.profile('gff3');
+
+      /* let lastBlob = {
+        url: '',
+        blob: null,
+      };
+
       const chunksTemp = {};
       for (const [ type, strands ] of chunks._ens()) {
         chunksTemp[type] = {};
@@ -680,7 +698,7 @@ async function FileReader(e) {
             let range = [ Infinity, -Infinity ];
             let cacheLength = 0;
             for (const v of vs) {
-              range = [ min(range[0], v.r[0]), max(range[1], v.r[1]) ];
+              range = [ Math.min(range[0], v.r[0]), Math.max(range[1], v.r[1]) ];
 
               let fullChunk = '';
               const decoder = new TextDecoder();
@@ -704,8 +722,9 @@ async function FileReader(e) {
 
                         return writeFLS({
                           ...v,
-                          parents: flatObj?.map(v => v.p).flat(),
-                          zIndex: flatObj?.map(v => v.z).flat()
+                          ...(flatObj?.reduce((sum, v) => {
+                            return { parents: sum.parents.concat(v.p), zIndex: sum.zIndex.concat(v.z) };
+                          }, { parents: [], zIndex: [] }) ?? {}),
                         });
                       });
                       rejected = rejected.concat(thisRejected);
@@ -728,7 +747,8 @@ async function FileReader(e) {
                 abort(err) { console.error(err); },
               });
 
-              const blob = await fetch(`blob:${v.u}`, { cache: 'no-store' }).then(r => r.blob());
+              const blob = lastBlob.url == v.u ? lastBlob.blob : await fetch(`blob:${v.u}`, { cache: 'no-store' }).then(r => r.blob());
+              lastBlob = { url: v.u, blob };
 
               const stream = blob.stream();
               await stream.pipeTo(write);
@@ -737,26 +757,34 @@ async function FileReader(e) {
             return full ?
               { accepted, rejected } :
               (group ? { accepted } : { lines: rejected, range, cacheLength });
-          }
+          };
 
           let { lines, range, cacheLength } = await testGroup();
           for (const [ group, groups ] of flat._ens()) {
             const { accepted } = await testGroup(group);
             if (accepted.length) {
-              const starts = accepted.map(v => v.starts).flat();
-              const ends = accepted.map(v => v.ends).flat();
-              range = [ min(range[0], ...starts), max(range[1], ...ends) ];
+              const { line, starts, ends } = accepted.reduce((sum, v) => {
+                if (v.line < sum.line)
+                  sum.line = v.line;
+
+                sum.starts = sum.starts.concat(v.starts);
+                sum.ends = sum.ends.concat(v.ends);
+                return sum;
+              }, { line: Infinity, starts: [], ends: [] });
+
+              range = [ Math.min(range[0], ...starts), Math.max(range[1], ...ends) ];
 
               void (function(line) {
                 lines.push(line);
                 cacheLength += line.length;
               })(writeFLS({
-                line: accepted.map(v => v.line).min(),
-                starts: accepted.map(v => v.starts).flat(),
-                ends: accepted.map(v => v.ends).flat(),
+                line,
+                starts,
+                ends,
                 group,
-                parents: groups.map(v => v.p),
-                zIndex: groups.map(v => v.z),
+                ...groups.reduce((sum, v) => {
+                  return { parents: sum.parents.concat(v.p), zIndex: sum.zIndex.concat(v.z) };
+                }, { parents: [], zIndex: [] }),
               }));
 
               if (cacheLength >= global.settings.readerCacheMax) {
@@ -780,9 +808,11 @@ async function FileReader(e) {
           for (const { u } of vs)
             URL.deleteObjectURL(`blob:${u}`);
         }
-      }
+      } */
 
-      return chunksTemp;
+      //console.profileEnd('gff3');
+
+      return chunks;
     }
   };
 
@@ -804,7 +834,7 @@ async function FileReader(e) {
 
           const $warning = body.appendChild('notification');
           $warning.addClass('bad_extension_warning');
-          $warning.innerHTML = `File <code>${file.name}</code> is not a supported extension!<br><br>Supported Extensions: ${extensions.k_map(k =>
+          $warning.innerHTML = `File <code>&quot;${file.name}&quot;</code> is not a supported extension!<br/><br/>Supported Extensions: ${extensions.k_map(k =>
             `<code>.${k}</code>`
           ).join(', ')}`;
 
@@ -890,13 +920,13 @@ async function FileReader(e) {
         });
 
         console.time(file.name);
-        // console.profile(file.name);
+        console.profile(file.name);
 
         const stream = file.stream();
         await stream.pipeTo(streamHandler);
 
         console.timeEnd(file.name);
-        // console.profileEnd(file.name);
+        console.profileEnd(file.name);
       }
 
       resolve({ type: 'done', data: { fileSaveNames } });
@@ -911,12 +941,10 @@ async function FileReader(e) {
       case 'done': {
         await Promise.all(metadataParser);
 
-        fileSaveNames.forEach(
-          ({ name, metaData }) => (function($file) {
-            $file.setAttr('metadata', JSON.stringify(metaData));
-            $file.rmvClass('hide');
-          })(body.qs(`body > .top > .files > .file:not(.template)[process-name='${name}']`))
-        );
+        fileSaveNames.forEach(({ name, metaData }) => {
+          global.metadata[name] = metaData;
+          body.qs(`body > .top > .files > .file:not(.template)[process-name='${name}']`)?.rmvClass('disabled');
+        });
         break;
       } case 'cancel':
       default: {

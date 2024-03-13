@@ -53,15 +53,16 @@
     </div>
 
     <div class='top section'>
-      <input type='file' multiple events='file_picker' name='import_file_selector'/>
-      <div class='import button'>
+      <div class='import button' events='import'>
         <insert type='dictionary/html' src='../../global/html/icons.ejs' key='import,x'></insert>
       </div>
       <div class='import types hide' events='import_types'>
-        <div class='button extension selected' extension='image/png' radio-group='export_extension' events='radio'>PNG</div>
-        <div class='button extension' extension='image/jpeg' radio-group='export_extension' events='radio'>JPG</div>
-        <div class='button extension' extension='image/webp' radio-group='export_extension' events='radio'>WEBP</div>
-        <div class='button extension' extension='image/svg+xml' radio-group='export_extension' events='radio'>SVG</div>
+        <div class='button type' type='file'>
+          <insert type='dictionary/html' src='../../global/html/icons.ejs' key='file'></insert>
+        </div>
+        <div class='button type' type='text'>
+          <insert type='dictionary/html' src='../../global/html/icons.ejs' key='code'></insert>
+        </div>
       </div>
 
       <div class='delete_data button disabled' events='delete_data'>
@@ -73,7 +74,7 @@
       </div>
 
       <span class='files auto_scroll' scroll-overflow-background='#000' scroll-speed='1.5'>
-        <span class='file select template' events='file'></span>
+        <span class='file disabled select template' events='file'></span>
       </span>
 
       <div class='draw button disabled' events='draw'>
@@ -94,6 +95,17 @@
         <span class='sub_text'>
           <small events='export_name_sub_text'>Press enter to submit</small>
         </span>
+      </div>
+    </div>
+
+    <div class='text_editor hide'>
+      <h3 class='title'>
+        <span class='text'>Data Inserter</span>
+      </h3>
+      <div class='textarea select' contenteditable spellcheck='false'></div>
+      <input class='file_name blank select' type='text' placeholder='File Name' events='text_editor_file_name'/>
+      <div class='button save' events='text_editor_save'>
+        <insert type='dictionary/html' src='../../global/html/icons.ejs' key='arrow_corner_down_right'></insert>
       </div>
     </div>
 
@@ -249,7 +261,7 @@
         <insert type='dictionary/html' src='../../global/html/icons.ejs' key='draw'></insert>
       </div>
       <div class='cancel button' events='settings_cancel'>
-        <insert type='dictionary/html' src='../../global/html/icons.ejs' key='revert'></insert>
+        <insert type='dictionary/html' src='../../global/html/icons.ejs' key='arrow_corner_up_left'></insert>
       </div>
     </div>
 
@@ -258,6 +270,9 @@
         <div class='hide_border'></div>
         <div class='text'>
           <h1>Groups</h1>
+        </div>
+        <div class='button expand_collapse' events='side_expand_collapse'>
+          <insert type='dictionary/html' src='../../global/html/icons.ejs' key='cheveron_right'></insert>
         </div>
       </div>
       <div class='content section'>
@@ -340,5 +355,7 @@
     <div class='cover hide'></div>
 
     <insert type='text/html' src='../../global/html/datalists.ejs'></insert>
+
+    <input class='file_selector' type='file' multiple events='file_picker' name='import_file_selector'/>
   </body>
 </html>

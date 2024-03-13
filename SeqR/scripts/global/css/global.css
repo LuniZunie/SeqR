@@ -135,6 +135,21 @@
   --text_3: #eee;
   --text_4: #fff;
 
+  --info_1: #00c;
+  --info_2: #00d;
+  --info_3: #00e;
+  --info_4: #00f;
+
+  --warning_1: #c80;
+  --warning_2: #d90;
+  --warning_3: #ea0;
+  --warning_4: #fb0;
+
+  --error_1: #c00;
+  --error_2: #d00;
+  --error_3: #e00;
+  --error_4: #f00;
+
   --subtitle_1: #bbb;
   --subtitle_2: #aaa;
   --subtitle_3: #888;
@@ -471,6 +486,8 @@ notification {
 
   transform: translateX(-50%);
 
+  z-index: 10;
+
   animation: NotificationIn 500ms ease-out 0s 1 normal forwards;
 }
 
@@ -482,10 +499,9 @@ notification.error {
   z-index: 3;
 }
 
-.helptip {
+[tooltip] {
   pointer-events: none;
 
-  color: var(--text_3);
   text-align: center;
   overflow: auto;
 
@@ -493,6 +509,22 @@ notification.error {
   border: 2px solid var(--shade_2-2);
 
   background: var(--shade_0-2);
+}
+
+[tooltip].help {
+  color: var(--text_3);
+}
+
+[tooltip].info {
+  color: var(--info_3);
+}
+
+[tooltip].warning {
+  color: var(--warning_3);
+}
+
+[tooltip].error {
+  color: var(--error_3);
 }
 
 .template {

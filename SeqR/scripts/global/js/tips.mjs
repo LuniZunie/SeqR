@@ -27,9 +27,24 @@ export default {
       }
     },
     content: {
+      text_editor: {
+        save: 'Load data',
+      },
       file_data: {
         delete_file_data: 'Delete file data',
         confirm_delete_file_data: 'Confirm you want to delete file data',
+      },
+    },
+  },
+  error: {
+    content: {
+      text_editor: {
+        file_name: {
+          non_ascii: 'File name cannot contain non-ASCII characters',
+          invalid_characters: 'File name cannot contain the following characters:<br><code>NUL \\ / : * ? " < > |</code>',
+          invalid_start: 'File name cannot start with a whitespace character',
+          invalid_end: 'File name cannot end with a whitespace character or a period',
+        }
       },
     },
   },

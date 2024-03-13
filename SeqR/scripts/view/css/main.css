@@ -19,6 +19,10 @@ body {
   --side_width: 30vw;
 }
 
+body:has(.side.collapsed) {
+  --side_width: 0vmin;
+}
+
 body > .loading_screen {
   position: fixed;
   left: 0;
@@ -52,11 +56,23 @@ body > .loading_screen > svg {
   animation: rotate360Clockwise 1.5s linear infinite;
 }
 
+body > .file_selector {
+  pointer-events: none;
+
+  position: fixed;
+  left: -100vw;
+  width: -100vw;
+
+  padding-right: 0.5vw;
+
+  opacity: 0;
+}
+
 body > .top {
   position: fixed;
   left: 0;
   top: 0;
-  width: calc(100vw - var(--side_width) - 2vmin);
+  width: calc(100vw - var(--side_width) - 1vmin);
   height: calc(var(--top_height) - 2px);
 
   padding: 0.5vmin;
@@ -66,38 +82,12 @@ body > .top {
   border-bottom: 2px solid var(--shade_0-3); /* try 2px solid var(--shade_2-0) */
 
   z-index: 2;
+
+  transition: all 500ms;
 }
 
 body > .top > * {
   line-height: calc(var(--top_height) - 2px);
-}
-
-body > .top > input[type=file] {
-  pointer-events: none;
-
-  position: fixed;
-  left: calc(var(--file_picker_left) + var(--file_picker_width) + 0.5vw);
-  width: 10vw;
-
-  padding-right: 0.5vw;
-
-  opacity: 0;
-}
-
-body > .top > input[type=file]::file-selector-button,
-body > .top > input[type=file]::-webkit-file-upload-button {
-  pointer-events: all;
-  cursor: pointer;
-
-  position: fixed;
-  left: var(--file_picker_left);
-  top: var(--file_picker_top);
-  width: var(--file_picker_width);
-  height: var(--file_picker_height);
-
-  line-height: calc(var(--top_height) - 2px);
-
-  border-radius: 0.5vmin;
 }
 
 body > .top > :is(.import, .delete_data, .draw, .export).button {
@@ -133,15 +123,13 @@ body > .top > :is(.import, .delete_data, .draw, .export).button svg {
   height: 75%;
 }
 
-body > .top > :is(.import, .delete_data, .draw, .export).button:hover:not(:has(.confirm:hover)),
-body > .top > input[type=file]:hover ~ .import.button {
+body > .top > :is(.import, .delete_data, .draw, .export).button:hover:not(:has(.confirm:hover)) {
   background: var(--hover_color);
 
   filter: brightness(1.2);
 }
 
-body > .top > :is(.import, .delete_data, .draw, .export).button:hover:active:not(:has(.confirm:hover:active)),
-body > .top > input[type=file]:hover:active ~ .import.button {
+body > .top > :is(.import, .delete_data, .draw, .export).button:hover:active:not(:has(.confirm:hover:active)) {
   background: var(--active_color);
 
   filter: brightness(1.4);
@@ -166,13 +154,230 @@ body > .top > .import.button {
   --hover_color: var(--blue_hover);
   --active_color: var(--blue_active);
 
-  pointer-events: none;
-
   left: 1.5vh;
 }
 
 body > .top > .import.button.cancel {
   pointer-events: all;
+}
+
+body > .top > .import.types {
+  position: absolute;
+  left: calc(1.5vh - 1vmin);
+  top: calc(var(--top_height) - 2px - 2vh + 3vh);
+  max-width: calc(100vw - var(--side_width) - 3vh - 2vmin);
+  height: calc(4vh + 1vmin);
+
+  padding: 1vmin;
+  border-radius: 1vmin;
+
+  line-height: 4vh;
+
+  white-space: nowrap;
+  overflow: auto hidden;
+
+  background: var(--shade_1-0);
+
+  transform-origin: top left;
+  transform: scale(1);
+
+  transition: all 500ms;
+}
+
+body > .top > .import.types.hide {
+  top: calc(var(--top_height) - 2px - 2vh);
+  left: calc(calc(calc(var(--top_height) - 2px - 2vh) * 3/2 - 2vmin) / 2);
+
+  opacity: 0;
+
+  transform: scale(0);
+}
+
+body > .top > .import.types > .type {
+  --hover_color: var(--blue_hover);
+  --active_color: var(--blue_active);
+
+  display: inline-block;
+
+  min-width: calc(calc(var(--top_height) - 2px - 2vh) * 3/2 - 2vmin);
+
+  padding: 0.5vmin 1vmin;
+  margin: 0 0.25vw;
+  border-radius: 1vmin;
+
+  font-size: 2em;
+  text-align: center;
+  line-height: calc(4vh - 1vmin);
+
+  background: var(--shade_2-0);
+
+  transition: all 250ms;
+}
+
+body > .top > .import.types > .type:first-child {
+  margin-left: 0;
+}
+
+body > .top > .import.types > .type:last-child {
+  margin-right: 0;
+}
+
+body > .top > .import.types > .type:hover {
+  background: var(--hover_color);
+
+  filter: brightness(1.2);
+}
+
+body > .top > .import.types > .type:active:hover {
+  background: var(--active_color);
+
+  filter: brightness(1.4);
+}
+
+body > .top > .import.types > .type > svg {
+  pointer-events: none;
+
+  aspect-ratio: 1/1;
+
+  height: 1em;
+}
+
+body > .text_editor {
+  position: fixed;
+  left: 10vw;
+  top: 10vh;
+  width: 80vw;
+  height: 80vh;
+
+  padding: 2vmin;
+  border-radius: 1vmin;
+
+  background: var(--shade_0-2);
+
+  z-index: 4;
+
+  transition: all 500ms;
+}
+
+body > .text_editor.hide {
+  pointer-events: none;
+
+  opacity: 0;
+}
+
+body > .text_editor > .title {
+  position: absolute;
+  left: 0;
+  top: calc(-1vmin - 1em + 1px);
+  width: 100%;
+  height: 1em;
+
+  padding: 0;
+  margin: 0;
+  border: 0;
+
+  font-size: 2em;
+  text-align: center;
+  color: var(--text_1);
+}
+
+body > .text_editor > .title > .text {
+  padding: 1vmin 2vmin;
+
+  border-top-left-radius: 1vmin;
+  border-top-right-radius: 1vmin;
+
+  background: var(--shade_0-2);
+}
+
+body > .text_editor > .textarea {
+  position: absolute;
+  left: 2vmin;
+  top: 2vmin;
+  width: calc(100% - 6vmin);
+  height: calc(100% - 13vmin);
+
+  padding: 1vmin;
+  border-radius: 1vmin;
+  outline: 0;
+
+  color: var(--text_1);
+
+  white-space: nowrap;
+  overflow: auto;
+
+  background: var(--shade_1-0);
+}
+
+body > .text_editor > .file_name {
+  position: absolute;
+  right: 12vmin;
+  bottom: 2vmin;
+  width: calc(100% - 16vmin);
+  height: 4vmin;
+
+  padding: 1vmin;
+  outline: 0;
+  border: 0;
+  border-radius: 1vmin;
+
+  font-size: 1.5em;
+  color: var(--text_1);
+
+  background: var(--shade_1-0);
+}
+
+body > .text_editor > .file_name.blank ~ .save.button {
+  pointer-events: none;
+
+  background: transparent;
+
+  filter: brightness(0.2);
+}
+
+body > .text_editor > .save.button {
+  --hover_color: var(--blue_hover);
+  --active_color: var(--blue_active);
+
+  aspect-ratio: 3/2;
+
+  position: absolute;
+  right: 2vmin;
+  bottom: 2vmin;
+  height: 6vmin;
+
+  border-radius: 1vmin;
+
+  text-align: center;
+  line-height: 6vmin;
+
+  background: var(--shade_1-0);
+
+  transition: all 250ms;
+}
+
+body > .text_editor > .save.button:hover {
+  background: var(--hover_color);
+
+  filter: brightness(1.2);
+}
+
+body > .text_editor > .save.button:hover:active {
+  background: var(--active_color);
+
+  filter: brightness(1.4);
+}
+
+body > .text_editor > .save.button > svg {
+  aspect-ratio: 1/1;
+
+  position: relative;
+  top: 12.5%;
+  height: 75%;
+}
+
+body > .text_editor_file_name_tooltip {
+  transition: top 500ms;
 }
 
 body > .top > .delete_data.button {
@@ -230,6 +435,8 @@ body > .top > .files {
   border-left: 2px solid var(--shade_2-0);
 
   line-height: calc(var(--top_height) - 2px - 2vh);
+
+  transition: all 500ms;
 }
 
 body > .top > .files > .file {
@@ -266,6 +473,12 @@ body > .top > .files > .file.hide {
   display: none;
 }
 
+body > .top > .files > .file.disabled {
+  pointer-events: none;
+
+  filter: brightness(0.2);
+}
+
 body > .top > .files > .file:nth-child(2) {
   margin-left: 0;
 }
@@ -290,7 +503,7 @@ body > .file_data_list > .button.delete {
 
   z-index: 4;
 
-  transition: all 250ms;
+  transition: opacity 250ms;
 }
 
 body > .file_data_list > .button.delete:not(:has(.confirm:hover)):hover {
@@ -460,6 +673,10 @@ body > .file_data_list > .file_data > .title {
   margin-top: 2vmin;
 }
 
+body > .file_data_list > .file_data > .title:not(:has(~ .metadata > .datum:not(.template))):before {
+  content: 'No ';
+}
+
 body > .file_data_list > .file_data > .metadata {
   --columns: 1000;
 
@@ -475,6 +692,10 @@ body > .file_data_list > .file_data > .metadata {
   font-size: 0.9em;
 
   background: var(--shade_0-3);
+}
+
+body > .file_data_list > .file_data > .metadata:not(:has(.datum:not(.template))) {
+  display: none;
 }
 
 body > .file_data_list > .file_data > .metadata > .datum {
@@ -993,7 +1214,7 @@ body > .side {
   position: fixed;
   right: 0;
   top: 0;
-  width: var(--side_width);
+  width: calc(var(--side_width) - 1vmin);
   height: 100vh;
 
   padding: 0.5vmin;
@@ -1002,6 +1223,13 @@ body > .side {
   background: var(--shade_0-0);
 
   z-index: 2;
+
+  transition: all 500ms;
+}
+
+body > .side.collapsed:not(.bypass_collapsed) {
+  padding: 0;
+  right: -2px;
 }
 
 body > .side > .top {
@@ -1039,6 +1267,60 @@ body > .side > .top > .text {
 
 body > .side > .top > .text > h1 {
   margin: 0;
+}
+
+body > .side > .top > .expand_collapse.button {
+  --hover_color: var(--blue_hover);
+  --active_color: var(--blue_active);
+
+  aspect-ratio: 1/1;
+
+  position: absolute;
+  left: 1vmin;
+  top: 1.5vh;
+  height: calc(var(--top_height) - 2px - 2vh);
+
+  border-radius: 50%;
+
+  text-align: center;
+
+  color: var(--shade_4-0);
+  background: transparent;
+
+  z-index: 2;
+
+  transition: all 500ms;
+}
+
+body > .side.collapsed > .top > .expand_collapse.button {
+  left: calc(2px - var(--top_height) + 2px + 2vh);
+  top: calc(52vh - var(--top_height) + 2px);
+
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+
+  background: var(--shade_1-0);
+
+  transform: rotateZ(180deg);
+}
+
+body > .side > .top > .expand_collapse.button:hover {
+  color: var(--hover_color);
+
+  filter: brightness(1.2);
+}
+
+body > .side > .top > .expand_collapse.button:hover:active {
+  color: var(--active_color);
+
+  filter: brightness(1.4);
+}
+
+body > .side > .top > .expand_collapse.button > svg {
+  aspect-ratio: 1/1;
+
+  position: relative;
+  height: 100%;
 }
 
 body > .side > .content {
@@ -1173,19 +1455,18 @@ body > .side > .content > .groups {
 
 body > .side > .content > .groups > .group {
   position: relative;
-  width: calc(var(--side_width) - 2vmin);
+  width: calc(var(--side_width) - 4vmin);
   min-height: calc(6vmin + calc(var(--side_width) - 2vmin) / 10 + 1.5em + 2vmin);
 
+  padding: 1vmin;
   margin: 1vmin;
   border-radius: 2vmin;
 
   background: var(--shade_0-3);
 
   z-index: 2;
-}
 
-body > .side > .content > .groups > .group {
-  padding: 1vmin;
+  transition: all 750ms;
 }
 
 body > .side > .content > .groups > .group > .name {
@@ -1282,6 +1563,8 @@ body > .side > .content > .groups > .group > .data {
   width: calc(var(--side_width) - 4vmin);
 
   margin-bottom: 0.5vmin;
+
+  transition: all 750ms;
 }
 
 body > .side > .content > .groups > .group > .data:before,
@@ -1292,7 +1575,7 @@ body > .side > .content > .groups > .group > .data:after {
 
   position: absolute;
   top: 0;
-  width: 8ch;
+  width: 4vmin;
   height: 90%;
 
   border-radius: 1vmin;
@@ -1655,10 +1938,12 @@ body > .content {
   position: fixed;
   left: 0;
   top: calc(var(--top_height) + 1vmin);
-  width: calc(100vw - var(--side_width) - 1vmin);
+  width: calc(100vw - var(--side_width));
   height: calc(100vh - var(--top_height) - 1vmin);
 
   background: url('../../../assets/images/logo.png') no-repeat center center / contain;
+
+  transition: all 500ms;
 }
 
 body > .content > .easel > .paper {

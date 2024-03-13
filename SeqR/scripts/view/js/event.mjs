@@ -95,8 +95,9 @@ page.events = new Events({
         function(e) {
           [
             { selector: 'body > .top > .delete_data.button > .confirm', hideOnClick: true },
-            { selector: 'body > .top > .export.extensions' },
-            { selector: 'body > .top > .export.name' },
+            { selector: 'body > .top > .import.types', includeSelf: true },
+            { selector: 'body > .top > .export.extensions', includeSelf: true },
+            { selector: 'body > .top > .export.name', includeSelf: true },
             { selector: 'body > .file_data_list > .delete.button > .confirm', hideOnClick: true },
             { selector: 'body > .data_select', includeSelf: true },
             { selector: 'body > .line_settings:not(.hide)', extra: 'line_setttings' },
@@ -167,9 +168,7 @@ page.events = new Events({
   radio: {
     click:
     function(e) {
-      this.gen(-1).qsa(`.selected[radio-group='${this.getAttr('radio-group')}']`).forEach(
-        $ => $.rmvClass('selected')
-      );
+      this.gen(-1).qsa(`.selected[radio-group='${this.getAttr('radio-group')}']`).forEach($ => $.rmvClass('selected'));
 
       this.addClass('selected');
     },
@@ -189,9 +188,138 @@ page.events = new Events({
       body.qs('announcment').addClass('hidden'); // rewrite this
     },
   },
+  side_expand_collapse: {
+    click: function(e) {
+      body.qs('body > .side').tglClass('collapsed');
+    },
+  },
+  import: {
+    mouseenter: function(e) {
+      new Tooltip('div.tooltip.help', body, tips.help.top.import)
+        .setOrigin('center', 'top')
+        .newAnchor('center', 'bottom', this)
+          .setDestructionEvents({
+            'mouseleave': null,
+            'click': null,
+          }, 250)
+          .tooltip
+        .requestOffset(0, 5)
+        .setBoundingBox('left', 'top', 'right', 'bottom')
+        .moveAbove(this)
+        .create(500, 500);
+    },
+    click: function(e) {
+      if (!this.hasClass('cancel'))
+        body.qs('body > .top > .import.types').rmvClass('hide');
+    },
+  },
+  import_types: {
+    mouseover: function(e) {
+      if (e.target?.hasClass('type')) {
+        new Tooltip('div.tooltip.help', body, e.target.getAttr('type').capitalize())
+          .setOrigin('center', 'top')
+          .newAnchor('center', 'bottom', e.target)
+            .setDestructionEvents({
+              'mouseout': null,
+              'click': null,
+            }, 250)
+            .tooltip
+          .requestOffset(0, 5)
+          .setBoundingBox('left', 'top', 'right', 'bottom')
+          .moveAbove(e.target)
+          .create(500, 500);
+      }
+    },
+    click: function(e) {
+      if (e.target?.hasClass('type')) {
+        this.addClass('hide');
+        switch (e.target.getAttr('type')) {
+          case 'file':
+            return body.qs('body > .file_selector').click();
+          case 'text':
+            return (function($textEditor) {
+              $textEditor.qs('.file_name').value = '';
+              $textEditor.qs('.file_name').addClass('blank');
+
+              $textEditor.qs('.textarea').innerText = '';
+              $textEditor.qs('.textarea').focus();
+
+              const $cover = body.appendChild('div.cover.hide.editor');
+              $cover.rmvClass('hide');
+
+              $cover.addEventListener('click', function(e) {
+                $cover.addClass('hide');
+                setTimeout(() => $cover.memRmv(), parseTransition($cover).max());
+
+                $textEditor.addClass('hide');
+              });
+
+              return $textEditor.rmvClass('hide');
+            })(body.qs('body > .text_editor'));
+        }
+      }
+    },
+  },
+  text_editor_save: {
+    mouseenter: function(e) {
+      new Tooltip('div.tooltip.help', body, tips.help.content.text_editor.save)
+        .setOrigin('center', 'top')
+        .newAnchor('center', 'bottom', this)
+          .setDestructionEvents({
+            'mouseleave': null,
+            'click': null,
+          }, 250)
+          .tooltip
+        .requestOffset(0, 5)
+        .setBoundingBox('left', 'top', 'right', 'bottom')
+        .moveAbove(this)
+        .create(500, 500);
+    },
+    click: function(e) {
+      body.qs('body > .cover.editor').click();
+
+      (function($textEditor) {
+        LoadFileFromText($textEditor.qs('.textarea').innerText, $textEditor.qs('.file_name').value);
+      })(this.gen(-1));
+    },
+  },
+  text_editor_file_name: {
+    input: function(e) {
+      let offset = -5;
+      const errorMessage = text =>
+        offset -= new Tooltip('div.tooltip.error', body, text)
+          .setOrigin('center', 'bottom')
+          .requestAnchor('center', 'top', this)
+          .requestOffset(0, offset)
+          .newOffset(null, null, this)
+            .setDestructionEvents({
+              'input': null,
+            })
+            .tooltip
+          .setBoundingBox('left', 'top', 'right', 'bottom')
+          .moveAbove(this)
+          .create(250, 250)
+          .element.rect().h + 5;
+
+      if (this.value.match(/[^\x00-\x7F]/))
+        errorMessage(tips.error.content.text_editor.file_name.non_ascii);
+      if (this.value.match(/[\x00\\\/:\*\?"<>|]/))
+        errorMessage(tips.error.content.text_editor.file_name.invalid_characters);
+      if (this.value.match(/^\s/))
+        errorMessage(tips.error.content.text_editor.file_name.invalid_start);
+      if (this.value.match(/(\s|\.)$/))
+        errorMessage(tips.error.content.text_editor.file_name.invalid_end);
+
+      this.setClass('blank', !(this.value && offset == -5));
+    },
+    keypress: function(e) {
+      if (e.key == 'Enter' && !this.hasClass('blank'))
+        body.qs('body > .text_editor > .save').click();
+    }
+  },
   file_picker: {
     mouseenter: function(e) {
-      new Tooltip('div.tooltip.helptip', body, tips.help.top.import)
+      new Tooltip('div.tooltip.help', body, tips.help.top.import)
         .setOrigin('center', 'top')
         .requestAnchor('center', 'bottom', body.qs('body > .top > .import.button'))
         .requestOffset(0, 5)
@@ -226,7 +354,7 @@ page.events = new Events({
 
         (function($metadata) {
           const gridColums = +$metadata.getCS('--columns');
-          JSON.parse($.getAttr('metadata')).map(
+          global.metadata[$.getAttr('process-name')].map(
             datum => (function ($datum) {
               (function($label) {
                 $label.innerText = datum.label;
@@ -256,15 +384,16 @@ page.events = new Events({
 
               return span;
             })($metadata.template('.datum', 'append'))
-          ).reduce((rows, span) => {
-            const lastRow = rows.last();
-            if (lastRow.sum() + span > gridColums)
+          ).reduce(({ rows, lastRowLength }, span) => {
+            const lastRow = rows[rows.length - 1];
+            if (lastRowLength + span > gridColums) {
               rows.push([ span ]);
-            else
+              lastRowLength = 0;
+            } else
               lastRow.push(span);
 
-            return rows;
-          }, [[]]).reduce((i, row) => {
+            return { rows, lastRowLength: lastRowLength + span };
+          }, { rows: [[]], lastRowLength: 0 }).rows.reduce((i, row) => {
             const emptySpan = (gridColums - row.sum()) / 2; // / row.length;
             if (emptySpan == 0)
               return i + row.length;
@@ -295,7 +424,7 @@ page.events = new Events({
         (function($delete) {
           $delete.setAttr('file', $.getAttr('raw-name'));
 
-          $delete.style.left = `${$fileData.rect().x + $fileData.rect().w - $delete.rect().w}px`;
+          $delete.style.left = `${$fileData.rect().x + $fileData.rect().w - $delete.rect().w - vmin(1)}px`;
           $delete.style.top = `${$fileData.rect().y + $fileData.rect().h}px`;
           $delete.rmvClass('hide');
         })(body.qs('body > .file_data_list > .button.delete'));
@@ -325,7 +454,7 @@ page.events = new Events({
       if (!this.qs('.confirm').hasClass('hide'))
         return;
 
-      new Tooltip('div.tooltip.helptip', body, tips.help.content.file_data.delete_file_data)
+      new Tooltip('div.tooltip.help', body, tips.help.content.file_data.delete_file_data)
         .setOrigin('center', 'top')
         .newAnchor('center', 'bottom', this)
           .setDestructionEvents({
@@ -344,7 +473,7 @@ page.events = new Events({
   },
   delete_file_data_confirm: {
     mouseenter: function(e) {
-      new Tooltip('div.tooltip.helptip.confirm_delete_file_data', body, tips.help.content.file_data.confirm_delete_file_data)
+      new Tooltip('div.tooltip.help.confirm_delete_file_data', body, tips.help.content.file_data.confirm_delete_file_data)
         .setOrigin('center', 'top')
         .newAnchor('center', 'bottom', this)
           .setDestructionEvents({
@@ -362,6 +491,7 @@ page.events = new Events({
 
       (function(file) {
         delete global.data[file];
+        delete global.metadata[file];
         body.qs(`body > .top > .files > .file[raw-name='${file}']`)?.memRmv();
       })(this.gen(-1).getAttr('file'));
 
@@ -373,7 +503,7 @@ page.events = new Events({
       if (!body.qs('body > .top > .delete_data.button > .confirm').hasClass('hide'))
         return;
 
-      new Tooltip('div.tooltip.helptip', body, tips.help.top.delete_data)
+      new Tooltip('div.tooltip.help', body, tips.help.top.delete_data)
         .setOrigin('center', 'top')
         .newAnchor('center', 'bottom', this)
           .setDestructionEvents({
@@ -392,7 +522,7 @@ page.events = new Events({
   },
   delete_data_confirm: {
     mouseenter: function(e) {
-      new Tooltip('div.tooltip.helptip.confirm_delete_data', body, tips.help.top.confirm_delete_data)
+      new Tooltip('div.tooltip.help.confirm_delete_data', body, tips.help.top.confirm_delete_data)
         .setOrigin('center', 'top')
         .newAnchor('center', 'bottom', this)
           .setDestructionEvents({
@@ -412,6 +542,7 @@ page.events = new Events({
       global.dataRange = [ Infinity, -Infinity ];
 
       global.data = {};
+      global.metadata = {};
 
       global.groups.forEach(
         ({ $ }) => $.memRmv()
@@ -442,7 +573,7 @@ page.events = new Events({
   },
   add_group: {
     mouseenter: function(e) {
-      new Tooltip('div.tooltip.helptip', body, tips.help.side.bottom.add_group)
+      new Tooltip('div.tooltip.help', body, tips.help.side.bottom.add_group)
         .setOrigin('center', 'bottom')
         .newAnchor('center', 'top', this)
           .setDestructionEvents({
@@ -461,7 +592,7 @@ page.events = new Events({
   },
   auto_group: {
     mouseenter: function(e) {
-      new Tooltip('div.tooltip.helptip', body, tips.help.side.bottom.auto_group)
+      new Tooltip('div.tooltip.help', body, tips.help.side.bottom.auto_group)
         .setOrigin('center', 'bottom')
         .newAnchor('center', 'top', this)
           .setDestructionEvents({
@@ -496,7 +627,7 @@ page.events = new Events({
   },
   clean_groups: {
     mouseenter: function(e) {
-      new Tooltip('div.tooltip.helptip', body, tips.help.side.bottom.clean_groups)
+      new Tooltip('div.tooltip.help', body, tips.help.side.bottom.clean_groups)
         .setOrigin('center', 'bottom')
         .newAnchor('center', 'top', this)
           .setDestructionEvents({
@@ -524,7 +655,7 @@ page.events = new Events({
   },
   remove_all_groups: {
     mouseenter: function(e) {
-      new Tooltip('div.tooltip.helptip', body, tips.help.side.bottom.remove_all_groups)
+      new Tooltip('div.tooltip.help', body, tips.help.side.bottom.remove_all_groups)
         .setOrigin('center', 'bottom')
         .newAnchor('center', 'top', this)
           .setDestructionEvents({
@@ -550,7 +681,7 @@ page.events = new Events({
   },
   group_name: {
     mouseenter: function(e) {
-      new Tooltip('div.tooltip.helptip', body, tips.help.side.group.title)
+      new Tooltip('div.tooltip.help', body, tips.help.side.group.title)
         .setOrigin('center', 'bottom')
         .newAnchor('center', 'top', this)
           .setDestructionEvents({
@@ -570,7 +701,7 @@ page.events = new Events({
   },
   group_edit: {
     mouseenter: function(e) {
-      new Tooltip('div.tooltip.helptip', body, tips.help.side.group.edit)
+      new Tooltip('div.tooltip.help', body, tips.help.side.group.edit)
         .setOrigin('center', 'bottom')
         .newAnchor('center', 'top', this)
           .setDestructionEvents({
@@ -688,12 +819,22 @@ page.events = new Events({
   group_data: {
     mouseenter: [
       function(e) {
-        new Tooltip('div.tooltip.helptip', body, tips.help.side.group.data.content)
+        new Tooltip('div.tooltip.help', body, tips.help.side.group.data.content)
           .setOrigin('center', 'bottom')
           .newAnchor('mouse', 'top', this)
             .setDestructionEvents({
               'mouseleave': null,
               'click': null,
+              'wheel': [
+                [
+                  function(anchor) {
+                    const $content = anchor.element;
+                    if ($content.scrollWidth > $content.clientWidth)
+                      throw 'prevent tooltip destruction';
+                  },
+                  { before: true, passive: true },
+                ]
+              ],
             }, 250)
             .tooltip
           .requestOffset(0, -5)
@@ -740,12 +881,22 @@ page.events = new Events({
   },
   group_data_file: {
     mouseenter: function(e) {
-      new Tooltip('div.tooltip.helptip', body, this.gen(-2).getAttr('file'))
+      new Tooltip('div.tooltip.help', body, this.gen(-2).getAttr('file'))
         .setOrigin('center', 'top')
         .newAnchor('center', 'bottom', this)
           .setDestructionEvents({
             'mouseleave': null,
             'click': null,
+            'wheel': [
+              [
+                function(anchor) {
+                  const $content = anchor.element.gen(-1);
+                  if ($content.scrollWidth > $content.clientWidth)
+                    throw 'prevent tooltip destruction';
+                },
+                { before: true, passive: true },
+              ]
+            ],
           }, 250)
           .tooltip
         .requestOffset(0, 5)
@@ -790,7 +941,7 @@ page.events = new Events({
   },
   group_data_copy: {
     mouseenter: function(e) {
-      new Tooltip('div.tooltip.helptip', body, tips.help.side.group.data.copy)
+      new Tooltip('div.tooltip.help', body, tips.help.side.group.data.copy)
         .setOrigin('center', 'bottom')
         .newAnchor('center', 'top', this)
           .setDestructionEvents({
@@ -822,7 +973,7 @@ page.events = new Events({
   },
   group_data_paste: {
     mouseenter: function(e) {
-      new Tooltip('div.tooltip.helptip', body, tips.help.side.group.data.paste)
+      new Tooltip('div.tooltip.help', body, tips.help.side.group.data.paste)
         .setOrigin('center', 'bottom')
         .newAnchor('center', 'top', this)
           .setDestructionEvents({
@@ -854,7 +1005,7 @@ page.events = new Events({
   },
   group_format: {
     mouseenter: function(e) {
-      new Tooltip('div.tooltip.helptip', body, tips.help.side.group.format)
+      new Tooltip('div.tooltip.help', body, tips.help.side.group.format)
         .setOrigin('center', 'bottom')
         .newAnchor('center', 'top', this)
           .setDestructionEvents({
@@ -881,7 +1032,7 @@ page.events = new Events({
   },
   group_remove: {
     mouseenter: function(e) {
-      new Tooltip('div.tooltip.helptip', body, tips.help.side.group.remove)
+      new Tooltip('div.tooltip.help', body, tips.help.side.group.remove)
         .setOrigin('center', 'bottom')
         .newAnchor('center', 'top', this)
           .setDestructionEvents({
@@ -904,7 +1055,7 @@ page.events = new Events({
   },
   draw: {
     mouseenter: function(e) {
-      new Tooltip('div.tooltip.helptip', body, tips.help.side.draw)
+      new Tooltip('div.tooltip.help', body, tips.help.top.draw)
         .setOrigin('center', 'top')
         .newAnchor('center', 'bottom', this)
           .setDestructionEvents({
@@ -966,8 +1117,9 @@ page.events = new Events({
             global.draw.padding.page._forEach(([ k, v ]) =>
               $padding.qs(`.page > .content > .option.${k} > input`).value = v ?? ''
             );
+
             global.draw.padding.group._forEach(([ k, v ]) =>
-              $padding.qs(`.group > .option.${k} > input`).value = v ?? ''
+              $padding.qs(`.group > .content > .option.${k} > input`).value = v ?? ''
             );
           })($settings.qs('.padding'));
 
@@ -1035,8 +1187,8 @@ page.events = new Events({
 
       (function($inputs) {
         const mult = v => (v * (global.dataRange[1] - global.dataRange[0]) + global.dataRange[0]).rnd();
-        $inputs.qs('input[type=number].min').value = mult(min);
-        $inputs.qs('input[type=number].max').value = mult(max);
+        $inputs.qs('input[type="number"].min').value = mult(min);
+        $inputs.qs('input[type="number"].max').value = mult(max);
       })(body.qs('body > .settings.prompt > .selection > .inputs'));
 
       $shading.style.left = `${(min * 100)}%`;
@@ -1169,7 +1321,7 @@ page.events = new Events({
   },
   export: {
     mouseenter: function(e) {
-      new Tooltip('div.tooltip.helptip', body, tips.help.side.export)
+      new Tooltip('div.tooltip.help', body, tips.help.top.export)
         .setOrigin('center', 'top')
         .newAnchor('center', 'bottom', this)
           .setDestructionEvents({
@@ -1240,7 +1392,7 @@ page.events = new Events({
   },
   export_name_sub_text: {
     mouseenter: function(e) {
-      new Tooltip('div.tooltip.helptip', body, this.innerHTML)
+      new Tooltip('div.tooltip.help', body, this.innerHTML)
         .setOrigin('center', 'top')
         .newAnchor('center', 'bottom', this)
           .setDestructionEvents({

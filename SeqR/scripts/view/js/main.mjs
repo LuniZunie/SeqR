@@ -43,8 +43,10 @@ const page = {
     main: true,
     events: false,
   },
+  maxSideWidth: body.qs('body > .side').getCS('width'),
   events: null,
   currentAutoGroup: GetAutoGroup(),
+  paintMergePapers: {},
 };
 
 LooseUpdate(function(e) {
@@ -54,6 +56,10 @@ LooseUpdate(function(e) {
   );
 
   body.qs('body > .top > .extensions').style.setProperty('--extensions', body.qsa('body > .top > .extensions > .extension').length);
+});
+
+LooseUpdate(function(e) {
+  body.qsa('body > .text_editor > .text :not(.select)').forEach($ => $.addClass('select'));
 });
 
 function Loaded() {
@@ -70,23 +76,6 @@ function Loaded() {
   })(body.qs('body > .loading_screen'));
 
   UpdateSettingsTextPreview();
-
-  testFileReader(`##gff-version 3
-#!gff-spec-version 1.21
-#!processor NCBI annotwriter
-#!genome-build ASM584v2
-#!genome-build-accession NCBI_Assembly:GCF_000005845.2
-##sequence-region NC_000913.3 1 4641652
-##species https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=511145
-NC_000913.3	RefSeq	region	1	4641652	.	+	.	ID=NC_000913.3:1..4641652;Dbxref=taxon:511145;Is_circular=true;Name=ANONYMOUS;gbkey=Src;genome=chromosome;mol_type=genomic DNA;strain=K-12;substrain=MG1655
-NC_000913.3	RefSeq	gene	190	255	.	=	.	ID=gene-b0001;Dbxref=ASAP:ABE-0000006,ECOCYC:EG11277,GeneID:944742;Name=thrL;gbkey=Gene;gene=thrL;gene_biotype=protein_coding;gene_synonym=ECK0001;locus_tag=b0001
-NC_000913.3	RefSeq	CDS	190	255	.	=	0	ID=cds-NP_414542.1;Parent=gene-b0001;Dbxref=UniProtKB/Swiss-Prot:P0AD86,Genbank:NP_414542.1,ASAP:ABE-0000006,ECOCYC:EG11277,GeneID:944742;Name=NP_414542.1;gbkey=CDS;gene=thrL;locus_tag=b0001;orig_transcript_id=gnl|b0001|mrna.NP_414542;product=thr operon leader peptide;protein_id=NP_414542.1;transl_table=11
-NC_000913.3	RefSeq	gene	337	2799	.	+	.	ID=gene-b0002;Dbxref=ASAP:ABE-0000008,ECOCYC:EG10998,GeneID:945803;Name=thrA;gbkey=Gene;gene=thrA;gene_biotype=protein_coding;gene_synonym=ECK0002,Hs,thrA1,thrA2,thrD;locus_tag=b0002`);
-
-  setTimeout(() => {
-    document.querySelector("body > div.side.section > div.content.section > div.button.auto").click();
-    document.querySelector("body > div.top.section > span > span:nth-child(2)").click();
-  }, 200)
 }
 
 function WaitForLoad() {
@@ -122,9 +111,9 @@ FixedUpdate(function(e) {
   );
 
   const clip = JSON.stringify(global.clipboard?.data);
-  (global.groups ?? []).forEach(
-    ({ $, o }) => o.forEach(
-      (options, i) => $.qs(`.data[datum-index='${i}'] > .paste.button`)?.setClass('disabled',
+  (global.groups ?? []).forEach(({ $, o }) =>
+    o.forEach((options, i) =>
+      $.qs(`.data[datum-index='${i}'] > .paste.button`)?.setClass('disabled',
         !(global.clipboard?.type == 'line_style' && global.clipboard?.data?._len() && JSON.stringify(options) != clip)
       )
     )
@@ -458,7 +447,21 @@ async function Paint(e) {
     }
 
     let imageMergeId = 0;
-    let imageMergePromise = [];
+    let imageMergePromise = {};
+
+    page.paintMergePapers = {
+      0: {
+        pen: (function($paper) {
+          $paper.width = settings.resolution;
+          $paper.height = settings.resolution;
+
+          return $paper.getContext('2d');
+        })(document.createElement('canvas')),
+        promises: [],
+      }
+    };
+
+    const { rectMax, imageMax } = global.settings;
 
     const dh_min = 1 / settings.resolution;
     for (const [ group_i, dataFile ] of settings.draw.d._ens()) {
@@ -547,30 +550,41 @@ async function Paint(e) {
                   $path.setAttr('fill', settings.overrideGroupColors ? (c || option.c) : option.c);
                   $path.setAttr('d', `${DrawSvgLine(option, dx_1, dy, dx_2, dy + dh).join(' ')} Z`);
 
-                  if (++count.rect >= 2500) { // copilot wants to try 10000 - not sure if this is a good idea - will try later
+                  if (++count.rect >= rectMax) {
                     draw_i += count.rect;
                     CreateSvgImage.call($svg, h_svg, settings.resolution, imageMergeId);
 
                     count.rect = 0;
-                    if (++count.image >= 20) { // copilot wants to try 100 and 1000 - not sure if this is a good idea - will try later
-                      await Promise.all(imageMergePromise);
+                    if (++count.image >= imageMax) {
+                      console.log('a', imageMergePromise);
 
-                      imageMergePromise = [ new Promise(r_merge => {
-                        MergeSvgImages.call($svg, settings.resolution, r_merge, imageMergeId++);
-                        $notif.innerText = `Drawing... (${(draw_i)} lines)`;
-                      }) ];
+                      imageMergePromise[imageMergeId] = new Promise(async r_merge => {
+                        let mergeId = imageMergeId;
+                        MergeSvgImages.call($svg, settings.resolution, () => r_merge(mergeId), imageMergeId++);
+                        requestIdleCallback(() =>
+                          $notif.innerText = `Drawing... (${(draw_i)} lines)`
+                        );
+                      }).then(mergeId => delete imageMergePromise[mergeId]);
 
-                      count.image = 0;
+                      console.log('b', imageMergePromise);
+
+                      count.image = 1;
                     }
                   }
                 };
 
-                wait.push(Promise.all(starts.map((s, i) => {
-                  const option = settings.draw.o[data[line]];
+                for (const i in starts) {
+                  const s = starts[i];
                   const e = ends[i];
+                  const option = settings.draw.o[data[line]];
 
-                  return drawLine(s, e, option, color);
-                })).then(() => delete settings.draw.y[line]));
+                  if (count.image >= imageMax - 1)
+                    await drawLine(s, e, option, color);
+                  else
+                    wait.push(drawLine(s, e, option, color));
+                }
+
+                delete settings.draw.y[line];
               }
 
               lines = null;
@@ -584,7 +598,7 @@ async function Paint(e) {
         }).catch(err => { throw err; });
       }).catch(err => { throw err; });
 
-      await Promise.all(wait);
+      await Promise.allSettled(wait);
       wait = [];
 
       settings.draw.d[group_i].delete();
@@ -597,7 +611,7 @@ async function Paint(e) {
 
       y += settings.padding.group.bottom;
     }
-    await Promise.all(imageMergePromise);
+    await Promise.allSettled(imageMergePromise._vs());
 
     $notif.innerText = `Drawing... (${draw_i} lines)`;
 
@@ -620,9 +634,9 @@ async function Paint(e) {
     }
 
     if ($svg.qs(':is(path, text):not(.template)'))
-      CreateSvgImage.call($svg, h_svg, settings.resolution);
+      CreateSvgImage.call($svg, h_svg, settings.resolution, imageMergeId);
 
-    await new Promise(r_merge => MergeSvgImages.call($svg, settings.resolution, r_merge));
+    await new Promise(r_merge => MergeSvgImages.call($svg, settings.resolution, r_merge, imageMergeId, true));
 
     $svg.qsa('image:not(.template)').forEach($image => $image.style.display = '');
 
@@ -693,7 +707,7 @@ async function Lines(file, type, strand, s, e, lines) {
                 (s <= start && e >= end))
               );
             else
-              obj = console.log(fullChunk.replace(check, '').split('\n')) || fullChunk.replace(check, '').split('\n').map(line => readFLS(line));
+              obj = /* console.log(fullChunk.replace(check, '').split('\n')) ||  */fullChunk.replace(check, '').split('\n').map(line => readFLS(line));
 
             return;
           },
@@ -702,7 +716,7 @@ async function Lines(file, type, strand, s, e, lines) {
           },
         });
 
-        const blob = await fetch(`blob:${u}`, { cache: 'no-store' }).then(r => r.blob());
+        const blob = await fetch(`blob:${u}`).then(r => r.blob());
 
         const stream = blob.stream();
         await stream.pipeTo(write);
@@ -827,6 +841,25 @@ function CreateSvgImage(h, res, mergeId) { // poor code quality - contains parts
   this.qsa(':is(path, text, g):not(.template)')?.memRmv(); // remove paths and text
 
   this.appendChild($image); // add image to svg
+
+  page.paintMergePapers[mergeId].promises.push( // add image to merge batch
+    new Promise(async r_img => {
+      let pen = page.paintMergePapers[mergeId].pen;
+
+      const img = new Image(res, res);
+      img.src = url;
+      img.onload = () => {
+        pen.drawImage(img, 0, 0, res, res);
+
+        img.memRmv();
+        img.onload = undefined;
+
+        pen = undefined;
+
+        r_img();
+      };
+    })
+  );
 }
 
 /**
@@ -837,28 +870,29 @@ function CreateSvgImage(h, res, mergeId) { // poor code quality - contains parts
  * @param {boolean} [final=false] - Indicates whether the merged image is the final image.
  * @returns {Promise<void>} - A promise that resolves when the merging is complete.
  */
-async function MergeSvgImages(res, r_merge, mergeId = -1) {
-  const imageSelector = `image:not(.template)${mergeId == -1 ? '' : `.merge_${mergeId}`}`;
+async function MergeSvgImages(res, r_merge, mergeId, final) {
+  if (!final) { // create new canvas for next merge batch
+    let pen = document.createElement('canvas').getContext('2d');
+    (pen.canvas.width = res), (pen.canvas.height = res); // set canvas size
 
-  const $paper = document.createElement('canvas');
-  const pen = $paper.getContext('2d');
+    let resolve;
+    page.paintMergePapers[mergeId + 1] = {
+      pen,
+      promises: [
+        new Promise(r => {
+          resolve = r;
+        })
+      ],
+    };
 
-  ($paper.width = res), ($paper.height = res); // set canvas size
+    page.paintMergePapers[mergeId + 1].firstPromise = resolve;
+    resolve = undefined;
+  }
 
-  await Promise.all(this.qsa(imageSelector).map(function($image) {
-    const img = new Image(res, res);
-    img.src = $image.getAttr('href');
-    return new Promise(r_img => {
-      img.onload = () => {
-        pen.drawImage(img, 0, 0, res, res);
+  await Promise.allSettled(page.paintMergePapers[mergeId].promises); // wait for current merge batch to complete
 
-        img.memRmv();
-        img.onload = undefined;
-
-        r_img();
-      };
-    });
-  }));
+  let $paper = page.paintMergePapers[mergeId].pen.canvas;
+  delete page.paintMergePapers[mergeId];
 
   $paper.toBlob(blob => {
     const blobUrl = (URL || webkitURL || window).createObjectURL(blob, { type: 'image/svg+xml;charset=utf-8' });
@@ -867,14 +901,36 @@ async function MergeSvgImages(res, r_merge, mergeId = -1) {
     $image.setAttrs('x', 'y', 0); // set image position
     $image.setAttrs('width', 'height', '100%'); // set image size
     $image.setAttr('href', blobUrl); // set image href
-    $image.addClass(`merge_${mergeId + 1}`); // add merge id to image
+    $image.addClass(`merge_${++mergeId}`); // add merge id to image
+
+    if (!final) // add merged image to next merge batch
+      page.paintMergePapers[mergeId].promises.push(
+        new Promise(async r_img => {
+          let pen = page.paintMergePapers[mergeId].pen;
+
+          const img = new Image(res, res);
+          img.src = blobUrl;
+          img.onload = () => {
+            pen.drawImage(img, 0, 0, res, res);
+
+            img.memRmv();
+            img.onload = undefined;
+
+            pen = undefined;
+
+            page.paintMergePapers[mergeId].firstPromise?.();
+            r_img();
+          };
+        })
+      );
 
     $image.onload = () => {
-      this.qsa(imageSelector).forEach($ => { // remove images and revoke object urls
+      this.qsa(`image:not(.template).merge_${mergeId - 1}`).forEach($ => { // remove images and revoke object urls
         URL.deleteObjectURL($.getAttr('href'));
         $.memRmv();
       });
 
+      console.log(mergeId - 1, final)
       this.appendChild($image); // add image to svg
 
       $paper.memRmv();
@@ -1204,11 +1260,14 @@ function AreGroupsClean() {
  * @returns {string} The auto group data in JSON format.
  */
 function GetAutoGroup() {
-  return JSON.stringify({ data: global.data.v_$map(types =>
-    (types ?? {}).v_$map(strands =>
-      (strands ?? {})._ks().sort()
-    )
-  ), groups: global.groups });
+  return JSON.stringify({
+    data: global.data.v_$map(types =>
+      types?.v_$map(strands =>
+        strands?.k_sort()
+      )
+    )._$filter(([ k, v ]) => v?._len()),
+    groups: global.groups
+  });
 }
 
 function UpdateSettingsTextPreview() {

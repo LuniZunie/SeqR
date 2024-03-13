@@ -155,6 +155,8 @@ const global = {
     linePreviewWidth: 'innerWidth / 5',
     readerCacheMax: 1000000,
     readerCacheMin: 500000,
+    rectMax: 2500,
+    imageMax: 250,
     tips: {
       helpEnabled: true,
     },
@@ -251,6 +253,7 @@ const global = {
       },
     }, */
   },
+  metadata: {},
   groups: [
   /* FORMAT:
     {
@@ -1549,11 +1552,19 @@ class Events {
     $s.forEach($ => {
       events.forEach(([ fn, options, ev ]) => {
         if (fn instanceof Function) {
+          let misc;
+          if (ev.startsWith('timer:')) {
+            misc = ev.split(':')[1];
+            ev = 'timer';
+          }
+
           switch (ev) {
             case 'disableclick': {
               if ($ instanceof Element)
                 $.setAttr('disableclick', fnObj[0]);
-
+              break;
+            } case 'timer': {
+              setTimeout(fn.bind($), misc, options); // maybe change so you can delete
               break;
             } default: {
               $.addEventListener(ev, fn, options);
@@ -1968,13 +1979,13 @@ class Modifier {
   }
   get tooltip() {
     if (this.#id == -1)
-      throw new Error('The modifier has already been deconstructed.');
+      return this;
 
     return this.#tooltip;
   }
   get tooltipElement() {
     if (this.#id == -1)
-      throw new Error('The modifier has already been deconstructed.');
+      return this.element;
 
     return this.#tooltip.element;
   }
@@ -2109,10 +2120,20 @@ class Modifier {
       v.v_$map(v =>
         v.map(v => {
           if (type == 'destruction')
-            v[0] = new Function('func', `
-              this.tooltip.deconstruct(${misc?.fadeOut});
-              return func.call(this, this);
-            `)(v[0]);
+            v[0] = new Function(`
+              try {
+                if (${v[1]?.before}) {
+                  const v = (${v[0]}).call(this, this);
+                  this?.tooltip?.deconstruct(${misc?.fadeOut});
+                  return v;
+                } else {
+                  this?.tooltip?.deconstruct(${misc?.fadeOut});
+                  return (${v[0]}).call(this, this);
+                }
+              } catch(err) {
+                return console.error(err);
+              }
+            `); // TODO: remove console.error when put into production
 
           return [ v[0].bind(this), v[1], v[2] ];
         })
@@ -2133,10 +2154,20 @@ class Modifier {
       v.v_$map(v =>
         v.map(v => {
           if (type == 'destruction')
-            v[0] = new Function('func', `
-              this.tooltip.deconstruct(${misc?.fadeOut});
-              return (${v[0]}).call(this, this);
-            `);
+            v[0] = new Function(`
+              try {
+                if (${v[1]?.before}) {
+                  const v = (${v[0]}).call(this, this);
+                  this?.tooltip?.deconstruct(${misc?.fadeOut});
+                  return v;
+                } else {
+                  this?.tooltip?.deconstruct(${misc?.fadeOut});
+                  return (${v[0]}).call(this, this);
+                }
+              } catch(err) {
+                return console.error(err);
+              }
+            `); // TODO: remove console.error when put into production
 
           return [ v[0].bind(this), v[1], v[2] ];
         })
@@ -2343,7 +2374,7 @@ class Tooltip extends Modifier {
         return;
 
       this.element.style.pointerEvents = '';
-      this.element.style.transition = (this.element.style.transition).split(',').concat(`opacity ${fadeIn}ms`).join(',').replace(/^,/, '');
+      this.element.style.transition = (this.element.getCS('transition')).split(',').concat(`opacity ${fadeIn}ms`).join(',').replace(/^,/, '');
       this.element.style.opacity = opacityTo;
 
       setTimeout(function() {
@@ -2589,7 +2620,7 @@ class Tooltip extends Modifier {
 
     this.element.style.pointerEvents = 'none';
     this.element.style.opacity = +(this.element.getCS('opacity') || 1);
-    this.element.style.transition = (this.element.style.transition).split(',').concat(`opacity ${fadeOut}ms`).join(',').replace(/^,/, '');
+    this.element.style.transition = (this.element.getCS('transition')).split(',').concat(`opacity ${fadeOut}ms`).join(',').replace(/^,/, '');
 
     this.element.style.opacity = 0;
     setTimeout(function() {

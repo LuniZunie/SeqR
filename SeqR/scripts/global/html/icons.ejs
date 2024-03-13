@@ -1,14 +1,14 @@
 <!--
   Copyright 2024 Cedric Hotopp
 
-  Licensed under the Apache License, Version 2.0 (the "License");
+  Licensed under the Apache License, Version 2.0 (the 'License');
   you may not use this file except in compliance with the License.
   You may obtain a copy of the License at
 
       http://www.apache.org/licenses/LICENSE-2.0
 
   Unless required by applicable law or agreed to in writing, software
-  distributed under the License is distributed on an "AS IS" BASIS,
+  distributed under the License is distributed on an 'AS IS' BASIS,
   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
   See the License for the specific language governing permissions and
   limitations under the License.
@@ -17,7 +17,7 @@
 <entry>
   <key>import</key>
   <value>
-    <svg class='import_icon' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>
+    <svg class='import_icon' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' viewBox='0 0 24 24'>
       <path d='M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4'/>
       <polyline points='7 10 12 15 17 10'/>
       <line x1='12' y1='15' x2='12' y2='3'/>
@@ -28,10 +28,40 @@
 <entry>
   <key>export</key>
   <value>
-    <svg class='export_icon' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>
+    <svg class='export_icon' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' viewBox='0 0 24 24'>
       <path d='M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4'/>
       <polyline points='17 8 12 3 7 8'/>
       <line x1='12' y1='3' x2='12' y2='15'/>
+    </svg>
+  </value>
+</entry>
+
+<entry>
+  <key>file</key>
+  <value>
+    <svg class='file_icon' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' viewBox='0 0 24 24'>
+      <path d='M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z'/>
+      <polyline points='13 2 13 9 20 9'/>
+    </svg>
+  </value>
+</entry>
+
+<entry>
+  <key>code</key>
+  <value>
+    <svg class='code_icon' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' viewBox='0 0 24 24'>
+      <polyline points='16 18 22 12 16 6'/>
+      <polyline points='8 6 2 12 8 18'/>
+    </svg>
+  </value>
+</entry>
+
+<entry>
+  <key>send</key>
+  <value>
+    <svg class='send_icon' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' viewBox='0 0 24 24'>
+      <line x1='22' y1='2' x2='11' y2='13'/>
+      <polygon points='22 2 15 22 11 13 2 9 22 2'/>
     </svg>
   </value>
 </entry>
@@ -66,6 +96,42 @@
 </entry>
 
 <entry>
+  <key>cheveron_up</key>
+  <value>
+    <svg class='cheveron_up_icon' fill='none' stroke='currentColor' clip-rule='evenodd' fill-rule='evenodd' stroke-linejoin='round' stroke-miterlimit='2' stroke-width='2' viewBox='0 0 24 24'>
+      <polyline points='18 15 12 9 6 15'/>
+    </svg>
+  </value>
+</entry>
+
+<entry>
+  <key>cheveron_right</key>
+  <value>
+    <svg class='cheveron_right_icon' fill='none' stroke='currentColor' clip-rule='evenodd' fill-rule='evenodd' stroke-linejoin='round' stroke-miterlimit='2' stroke-width='2' viewBox='0 0 24 24'>
+      <polyline points='9 18 15 12 9 6'/>
+    </svg>
+  </value>
+</entry>
+
+<entry>
+  <key>cheveron_down</key>
+  <value>
+    <svg class='cheveron_down_icon' fill='none' stroke='currentColor' clip-rule='evenodd' fill-rule='evenodd' stroke-linejoin='round' stroke-miterlimit='2' stroke-width='2' viewBox='0 0 24 24'>
+      <polyline points='6 9 12 15 18 9'/>
+    </svg>
+  </value>
+</entry>
+
+<entry>
+  <key>cheveron_left</key>
+  <value>
+    <svg class='cheveron_left_icon' fill='none' stroke='currentColor' clip-rule='evenodd' fill-rule='evenodd' stroke-linejoin='round' stroke-miterlimit='2' stroke-width='2' viewBox='0 0 24 24'>
+      <polyline points='15 18 9 12 15 6'/>
+    </svg>
+  </value>
+</entry>
+
+<entry>
   <key>trash</key>
   <value>
     <svg class='trash_icon' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>
@@ -85,11 +151,21 @@
 </entry>
 
 <entry>
-  <key>revert</key>
+  <key>arrow_corner_up_left</key>
   <value>
-    <svg class='revert_icon' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>
+    <svg class='arrow_corner_up_left_icon' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>
       <polyline points='14 15 9 20 4 15'/>
       <path d='M20 4h-7a4 4 0 0 0-4 4v12'/>
+    </svg>
+  </value>
+</entry>
+
+<entry>
+  <key>arrow_corner_down_right</key>
+  <value>
+    <svg class='arrow_corner_down_right_icon' fill='none' stroke='currentColor' clip-rule='evenodd' fill-rule='evenodd' stroke-linejoin='round' stroke-miterlimit='2' stroke-width='2' viewBox='0 0 24 24'>
+      <polyline points='15 10 20 15 15 20'/>
+      <path d='M4 4v7a4 4 0 0 0 4 4h12'/>
     </svg>
   </value>
 </entry>

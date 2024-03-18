@@ -74,22 +74,29 @@ page.events = new Events({
 
       body.cursorPosition(0);
     },
-    resize: function(e) {
-      const id = FixedUpdate(() => body.qsa('body > .previews > svg.preview:not(.template)').forEach(
-        $ => LinePreview(body.qs(`#${$.getAttr('target')} > .content`), true)
-      ));
+    resize: [
+      function(e) {
+        const id = FixedUpdate(() => body.qsa('body > .previews > svg.preview:not(.template)').forEach(
+          $ => LinePreview(body.qs(`#${$.getAttr('target')} > .content`), true)
+        ));
 
-      setTimeout(
-        () => requestAnimationFrame( // function
-          () => DeleteFixedUpdate(id)
-        ),
-        body.qs( // time
-          'body > .side > .content > .groups > .group:not(.template) > .data:not(.template) > .content'
-        )?.gen(-Infinity, 0).flat(Infinity).map(
-          $ => $ instanceof Element ? parseTransition($).max() : 0
-        ).max() ?? 0
-      );
-    },
+        setTimeout(
+          () => requestAnimationFrame( // function
+            () => DeleteFixedUpdate(id)
+          ),
+          body.qs( // time
+            'body > .side > .content > .groups > .group:not(.template) > .data:not(.template) > .content'
+          )?.gen(-Infinity, 0).flat(Infinity).map(
+            $ => $ instanceof Element ? parseTransition($).max() : 0
+          ).max() ?? 0
+        );
+      },
+      function(e) {
+        const $ = body.qs('body > .file_data_list > .file_data:not(.template)');
+        if ($)
+          events.get.file.click.call(body.qs(`body > .top > .files > .file[process-name='${$.getAttr('process-name')}']`));
+      },
+    ],
     mouseup: [
       [
         function(e) {
@@ -298,7 +305,7 @@ page.events = new Events({
             .tooltip
           .setBoundingBox('left', 'top', 'right', 'bottom')
           .moveAbove(this)
-          .create(250, 250)
+          .create()
           .element.rect().h + 5;
 
       if (this.value.match(/[^\x00-\x7F]/))
@@ -343,9 +350,12 @@ page.events = new Events({
   file: {
     click: function(e) {
       body.qsa('body > .file_data_list > .file_data:not(.template)')?.memRmv();
+      body.qsa('body > .cover.file_data')?.memRmv();
 
       const $ = this;
       (function($fileData) {
+        $fileData.setAttr('process-name', $.getAttr('process-name'));
+
         $fileData.qs('.raw.name').innerText = $.getAttr('raw-name');
         $fileData.qs('.raw.extension').innerText = $.getAttr('raw-extension');
 
@@ -367,8 +377,10 @@ page.events = new Events({
                       case 'link': {
                         (function($a) {
                           $a.innerText = v.text ?? v.link;
-                          $a.href = v.link;
+                          $a.setAttr('link', v.link);
                           $a.target = '_blank';
+
+                          page.events.add($a, 'file_data_link');
                         })($value.appendChild('a.select'));
                         break;
                       } default:
@@ -379,7 +391,7 @@ page.events = new Events({
                 });
               })($datum.qs('.value'));
 
-              const span = ($datum.scrollWidth * gridColums / ($metadata.clientWidth - vmin(2)) + 1).ceil(2).clamp(1, gridColums); // 2vmin padding (1vmin on each side)
+              const span = (($datum.scrollWidth + vmin(1)) * gridColums / ($metadata.clientWidth - vmin(2)) + 1).ceil(2).clamp(1, gridColums); // 2vmin padding (1vmin on each side)
               $datum.style.gridColumn = `auto / span ${span}`;
 
               return span;
@@ -433,8 +445,7 @@ page.events = new Events({
         $fileData.rmvClass('hide');
       })(body.qs('body > .file_data_list').template('.file_data', 'append'));
 
-      const $cover = body.appendChild('div.cover.hide.file_data');
-      $cover.rmvClass('hide');
+      const $cover = body.appendChild('div.cover.file_data');
 
       $cover.addEventListener('click', function(e) {
         $cover.addClass('hide');
@@ -447,6 +458,56 @@ page.events = new Events({
 
         body.qs('body > .file_data_list > .button.delete').addClass('hide');
       });
+    },
+  },
+  file_data_link: {
+    mouseenter: function(e) {
+      new Tooltip('div.tooltip.help', body, this.getAttr('link'))
+        .setOrigin('center', 'top')
+        .newAnchor('center', 'bottom', this)
+          .setDestructionEvents({
+            'mouseleave': null,
+            'click': null,
+          }, 250)
+          .tooltip
+        .requestOffset(0, 5)
+        .setBoundingBox('left', 'top', 'right', 'bottom')
+        .moveAbove(this)
+        .create(500, 500);
+    },
+    mousedown: function(e) {
+      e.preventDefault();
+    },
+    mouseup: function(e) {
+      body.qs('body > .leaving_site_warning > .title > .url').innerText = location.host;
+      body.qs('body > .leaving_site_warning > .link').innerText = this.getAttr('link');
+
+      let target = '_blank';
+      if (e.button == 0 && !(e.ctrlKey || e.shiftKey || e.metaKey || e.altKey))
+        target = '_self';
+      else if (e.button > 1)
+        return;
+
+      body.qs('body > .leaving_site_warning').setAttr('target', target);
+      body.qs('body > .leaving_site_warning').rmvClass('hide');
+
+      events.add(body.appendChild('div.cover.leaving_site'), 'leaving_site_cover');
+
+      e.preventDefault();
+    },
+  },
+  leaving_site_cover: {
+    click: function(e) {
+      body.qs('body > .leaving_site_warning').addClass('hide');
+      body.qs('body > .cover.leaving_site').memRmv();
+    },
+  },
+  stay_site: 'this.leaving_site_cover',
+  leave_site: {
+    click: function(e) {
+      open(this.gen(-1).qs('.link').innerText, this.gen(-1).getAttr('target') ?? '_blank');
+      body.qs('body > .leaving_site_warning').addClass('hide');
+      body.qs('body > .cover.leaving_site').memRmv();
     },
   },
   delete_file_data: {
@@ -714,7 +775,7 @@ page.events = new Events({
         .moveAbove(this)
         .create(500, 500);
     },
-    click: function(e) { // holy shit bro this code is cool as fuck - lowkey a lot of fun writing it!
+    click: function(e) { // cool code
       if (!global.data._len())
         return this.addClass('disabled');
 
@@ -748,21 +809,23 @@ page.events = new Events({
         $file.qs('p.label').innerHTML = file;
         $file.setAttr('file', file);
 
-        sortByHeight((types ?? {})._map(([ type, strands ]) => {
-          const $type = $file.template('.type.section', 'append');
-          $type.qs('p.label > span.text').innerHTML = type;
-          $type.setAttr('type', type);
+        sortByHeight(
+          (types ?? {})._map(([ type, strands ]) => {
+            const $type = $file.template('.type.section', 'append');
+            $type.qs('p.label > span.text').innerHTML = type;
+            $type.setAttr('type', type);
 
-          (strands ?? {})._$sort().k_forEach(strand => {
-            const $strand = events.add($type.template('.strand.button', 'append'), 'data_select_strand');
-            $strand.innerHTML = strand;
+            (strands ?? {})._$sort().k_forEach(strand => {
+              const $strand = events.add($type.template('.strand.button', 'append'), 'data_select_strand');
+              $strand.innerHTML = strand;
 
-            $strand.setClass('selected', group.d.some(datum => datum.f == file && datum.t == type && datum.s == strand));
-            $strand.setAttr('strand', strand);
-          });
+              $strand.setClass('selected', group.d.some(datum => datum.f == file && datum.t == type && datum.s == strand));
+              $strand.setAttr('strand', strand);
+            });
 
-          return $type;
-        }), $file,
+            return $type;
+          }),
+          $file,
           'b.qsa(".strand.button:not(.template)").length - a.qsa(".strand.button:not(.template)").length || a.getAttr("type").localeCompare(b.getAttr("type"))'
         );
 

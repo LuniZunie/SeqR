@@ -597,6 +597,8 @@ body > .file_data_list > .file_data.hide {
 }
 
 body > .file_data_list > .file_data a {
+  cursor: pointer;
+
   color: var(--link_1);
 
   transition: all 100ms;
@@ -718,6 +720,149 @@ body > .file_data_list > .file_data > .metadata > .datum {
 
 body > .file_data_list > .file_data > .metadata > .datum > .value > :is(span, a) {
   margin-left: 1ch;
+}
+
+body > .leaving_site_warning {
+  position: fixed;
+  left: 30vw;
+  top: 50vh;
+  width: calc(40vw - 4vmin);
+  max-height: calc(100vh - 4vmin);
+
+  padding: 2vmin;
+  margin: 0;
+  border: 0;
+  border-radius: 1vmin;
+
+  background: var(--shade_0-3);
+
+  z-index: 6;
+
+  transform: translateY(-50%);
+
+  transition: all 500ms;
+}
+
+body > .leaving_site_warning.hide {
+  pointer-events: none;
+
+  opacity: 0;
+}
+
+body > .leaving_site_warning > .title {
+  margin-top: 0;
+
+  text-align: center;
+  font-size: 2em;
+  color: var(--error_1);
+}
+
+body > .leaving_site_warning > .title > .url {
+  text-decoration: underline;
+}
+
+body > .leaving_site_warning > .text {
+  text-align: center;
+  font-size: 1.25em;
+  color: var(--text_1);
+}
+
+body > .leaving_site_warning > .text > strong {
+  color: var(--error_1);
+}
+
+body > .leaving_site_warning > .link {
+  display: block;
+
+  margin-top: 1em;
+  padding: 0.5em;
+  border-radius: 1vmin;
+
+  font-size: 1.25em;
+  color: var(--link_1);
+
+  overflow: hidden;
+
+  background: var(--shade_1-0);
+
+  transition: all 250ms;
+}
+
+body > .leaving_site_warning > .bottom {
+  position: relative;
+  left: -2vmin;
+  top: 2vmin;
+  width: 100%;
+  height: calc(1.5em + 3vmin);
+
+  padding: 2vmin;
+  border-bottom-left-radius: 1vmin;
+  border-bottom-right-radius: 1vmin;
+
+  background: var(--shade_0-2);
+}
+
+body > .leaving_site_warning > .bottom > .button {
+  float: right;
+
+  position: relative;
+  top: 0;
+  width: 7ch;
+  height: 1em;
+
+  padding: 1.5vmin;
+  border-radius: 1vmin;
+
+  text-align: center;
+  font-size: 1.5em;
+  line-height: 1em;
+
+  background: var(--color);
+
+  transition: all 250ms;
+}
+
+body > .leaving_site_warning > .bottom > .button:hover {
+  background: var(--hover_color);
+
+  filter: brightness(1.2);
+}
+
+body > .leaving_site_warning > .bottom > .button:active:hover {
+  background: var(--active_color);
+
+  filter: brightness(1.4);
+}
+
+body > .leaving_site_warning > .bottom > .button.stay {
+  --color: var(--shade_1-2);
+  --hover_color: var(--blue_hover);
+  --active_color: var(--blue_active);
+
+  right: 2vmin;
+}
+
+body > .leaving_site_warning > .bottom > .button.leave {
+  --color: var(--red_active);
+  --hover_color: var(--red_background);
+  --active_color: var(--red_border);
+
+  right: 0;
+}
+
+body > .cover.leaving_site {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 100vw;
+  height: 100vh;
+
+  background: var(--shade_0-0);
+  opacity: 0.5;
+
+  z-index: 5;
+
+  transition: all 500ms;
 }
 
 body > .top > .draw.button {

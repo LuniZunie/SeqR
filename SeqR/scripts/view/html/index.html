@@ -103,7 +103,7 @@
         <span class='text'>Data Inserter</span>
       </h3>
       <div class='textarea select' contenteditable spellcheck='false'></div>
-      <input class='file_name blank select' type='text' placeholder='File Name' events='text_editor_file_name'/>
+      <input class='file_name blank select' type='text' placeholder='File Name' name='text_editor_file_name' events='text_editor_file_name'/>
       <div class='button save' events='text_editor_save'>
         <insert type='dictionary/html' src='../../global/html/icons.ejs' key='arrow_corner_down_right'></insert>
       </div>
@@ -126,6 +126,16 @@
         <span class='confirm hide' events='delete_file_data_confirm'>
           <insert type='dictionary/html' src='../../global/html/icons.ejs' key='trash_confirm'></insert>
         </span>
+      </div>
+    </div>
+
+    <div class='leaving_site_warning hide'>
+      <h1 class='title'>Leaving <span class='url'>example.com</span></h1>
+      <p class='text'>Are you sure you want to leave this site? The following link may be <strong>dangerous!</strong></p>
+      <a class='link auto_scroll'>https://www.example.com</a>
+      <div class='bottom'>
+        <div class='button leave' events='leave_site'>Leave</div>
+        <div class='button stay' events='stay_site'>Stay</div>
       </div>
     </div>
 

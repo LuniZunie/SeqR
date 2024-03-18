@@ -25,7 +25,9 @@ Object.entries(globalExports).forEach(
 
 export {
   page,
-  Update
+  Update,
+  LoadBodySelectors,
+  LoadHeadSelectors,
 };
 
 const page = {
@@ -48,7 +50,7 @@ const page = {
   spectrum_pen: body.qs('body > .color_spectrum > canvas.picker').getContext('2d', { willReadFrequently: true, alpha: false }),
 };
 
-window.addEventListener('message', function(e) {
+addEventListener('message', function(e) {
   if (e.data.from == 'view') {
     page.settings = { c: e.data.c, l: e.data.l };
     body.style.setProperty('--page_bg', e.data.bg);
@@ -89,6 +91,8 @@ function LoadColorSpectrum() {
 
 function LoadHeadSelectors() {
   const $content = body.qs('body > .head_selector > .content');
+  $content.qsa('.head:not(.template)').memRmv();
+
   const columns = +getComputedStyle($content).columnCount;
   global.lineStyles.heads._$map(([ k ], i) => {
     const $head = $content.template('.head', 'append');
@@ -142,6 +146,8 @@ function LoadHeadSelectors() {
 
 function LoadBodySelectors() {
   const $content = body.qs('body > .body_selector > .content');
+  $content.qsa('.body:not(.template)').memRmv();
+
   const columns = +getComputedStyle($content).columnCount;
   global.lineStyles.bodies._$map(([ k ], i) => {
     const $body = $content.template('.body', 'append');

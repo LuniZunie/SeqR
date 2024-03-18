@@ -57,6 +57,9 @@ page.events = new Events({
           $ => $ instanceof Element ? parseTransition($).max() : 0
         ).max()
       );
+
+      LoadBodySelectors();
+      LoadHeadSelectors();
     },
   },
   head: {

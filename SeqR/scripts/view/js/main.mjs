@@ -556,8 +556,6 @@ async function Paint(e) {
 
                     count.rect = 0;
                     if (++count.image >= imageMax) {
-                      console.log('a', imageMergePromise);
-
                       imageMergePromise[imageMergeId] = new Promise(async r_merge => {
                         let mergeId = imageMergeId;
                         MergeSvgImages.call($svg, settings.resolution, () => r_merge(mergeId), imageMergeId++);
@@ -565,8 +563,6 @@ async function Paint(e) {
                           $notif.innerText = `Drawing... (${(draw_i)} lines)`
                         );
                       }).then(mergeId => delete imageMergePromise[mergeId]);
-
-                      console.log('b', imageMergePromise);
 
                       count.image = 1;
                     }
@@ -930,7 +926,6 @@ async function MergeSvgImages(res, r_merge, mergeId, final) {
         $.memRmv();
       });
 
-      console.log(mergeId - 1, final)
       this.appendChild($image); // add image to svg
 
       $paper.memRmv();

@@ -2361,9 +2361,6 @@ class Tooltip extends Modifier {
     return this;
   }
   create(time, fadeIn, update = true) {
-    if (!+time)
-      return update ? this.update() : this;
-
     const opacityTo = +(this.element.getCS('opacity') || 1);
     this.element.style.opacity = 0;
     this.element.style.pointerEvents = 'none';

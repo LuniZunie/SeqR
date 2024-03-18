@@ -302,7 +302,7 @@ body > .color_spectrum > .rgb {
 body > .color_spectrum > .rgb > .number {
   display: inline-block;
 
-  width: 5ch;
+  width: 7ch;
 
   border-bottom: 1px solid var(--text_1);
 
